@@ -78,10 +78,14 @@ public class ChatCompletionsController {
 		String id = "chatcmpl-" + UUID.randomUUID();
 		long created = Instant.now().getEpochSecond();
 		SseEmitter emitter = new SseEmitter(0L);
+		// some providers (gemini) have no [DONE] sentinel - the gateway's public
+		// contract always ends with one, whether the adapter signals done or the
+		// upstream flux just completes
+		java.util.concurrent.atomic.AtomicBoolean doneSent = new java.util.concurrent.atomic.AtomicBoolean();
 		Disposable subscription = forwardingService.forwardStream(request).subscribe(
-				chunk -> sendChunk(emitter, id, created, request.model(), chunk),
+				chunk -> sendChunk(emitter, id, created, request.model(), chunk, doneSent),
 				emitter::completeWithError,
-				emitter::complete);
+				() -> finish(emitter, doneSent));
 		// client went away -> stop pulling from the upstream
 		emitter.onCompletion(subscription::dispose);
 		emitter.onTimeout(subscription::dispose);
@@ -89,11 +93,22 @@ public class ChatCompletionsController {
 		return emitter;
 	}
 
-	private void sendChunk(SseEmitter emitter, String id, long created, String model, CanonicalStreamChunk chunk) {
+	private void finish(SseEmitter emitter, java.util.concurrent.atomic.AtomicBoolean doneSent) {
+		try {
+			if (doneSent.compareAndSet(false, true)) {
+				emitter.send(SseEmitter.event().data("[DONE]"));
+			}
+			emitter.complete();
+		} catch (Exception e) {
+			emitter.completeWithError(e);
+		}
+	}
+
+	private void sendChunk(SseEmitter emitter, String id, long created, String model, CanonicalStreamChunk chunk,
+			java.util.concurrent.atomic.AtomicBoolean doneSent) {
 		try {
 			if (chunk.done()) {
-				emitter.send(SseEmitter.event().data("[DONE]"));
-				emitter.complete();
+				finish(emitter, doneSent);
 				return;
 			}
 			if (chunk.usage() != null && chunk.contentDelta() == null && chunk.finishReason() == null) {

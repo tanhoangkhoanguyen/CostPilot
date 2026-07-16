@@ -1,9 +1,13 @@
 package com.costpilot.upstream;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 // Selects the upstream the gateway forwards to. MOCK (default) targets the embedded
-// mock LLM server so dev and tests cost $0; REAL targets the configured provider URL.
+// mock LLM server so dev and tests cost $0; REAL targets the configured provider
+// endpoints - switching is env/config only, never a code change.
 @ConfigurationProperties(prefix = "costpilot.upstream")
 public class UpstreamProperties {
 
@@ -13,7 +17,11 @@ public class UpstreamProperties {
 
 	private Mode mode = Mode.MOCK;
 
-	private final Provider openai = new Provider();
+	/** Per-provider endpoint config, keyed by provider id (openai/anthropic/gemini). */
+	private final Map<String, Provider> providers = new HashMap<>();
+
+	/** Explicit model -> provider overrides, e.g. "my-finetune: openai". */
+	private final Map<String, String> modelProviders = new HashMap<>();
 
 	public Mode getMode() {
 		return mode;
@@ -23,8 +31,16 @@ public class UpstreamProperties {
 		this.mode = mode;
 	}
 
-	public Provider getOpenai() {
-		return openai;
+	public Map<String, Provider> getProviders() {
+		return providers;
+	}
+
+	public Map<String, String> getModelProviders() {
+		return modelProviders;
+	}
+
+	public Provider provider(String providerId) {
+		return providers.getOrDefault(providerId, new Provider());
 	}
 
 	public static class Provider {
