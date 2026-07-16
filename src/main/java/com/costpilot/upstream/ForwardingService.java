@@ -57,14 +57,15 @@ public class ForwardingService {
 				.uri(baseUrl(adapter) + adapter.chatPath(request))
 				.contentType(MediaType.APPLICATION_JSON);
 		if (properties.getMode() == UpstreamProperties.Mode.REAL) {
-			spec.headers(headers -> adapter.applyAuth(headers, properties.getOpenai().getApiKey()));
+			spec.headers(headers -> adapter.applyAuth(headers,
+					properties.provider(adapter.providerId()).getApiKey()));
 		}
 		return spec.bodyValue(adapter.buildUpstreamBody(request));
 	}
 
 	private String baseUrl(ProviderAdapter adapter) {
 		if (properties.getMode() == UpstreamProperties.Mode.REAL) {
-			return properties.getOpenai().getBaseUrl();
+			return properties.provider(adapter.providerId()).getBaseUrl();
 		}
 		// MOCK: the embedded mock server lives in this same app; resolve the live port
 		// so it works for bootRun (8080) and random-port tests alike.
