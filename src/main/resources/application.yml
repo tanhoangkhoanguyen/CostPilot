@@ -14,6 +14,13 @@ spring:
     redis:
       host: ${COSTPILOT_REDIS_HOST:localhost}
       port: ${COSTPILOT_REDIS_PORT:6379}
+  jpa:
+    # Flyway owns the schema; Hibernate only checks that entities match it.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
 
 server:
   port: 8080
