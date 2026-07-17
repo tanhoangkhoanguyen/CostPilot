@@ -18,6 +18,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.costpilot.core.model.CanonicalChatResponse;
+import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.core.model.Usage;
 import com.costpilot.upstream.ForwardingService;
 
 import reactor.core.publisher.Flux;
@@ -46,12 +49,8 @@ class ChatCompletionsContractTest {
 
 	@Test
 	void nonStreamingRelaysUpstreamJson() throws Exception {
-		String upstream = """
-				{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-mini",
-				 "choices":[{"index":0,"message":{"role":"assistant","content":"hello costpilot"},"finish_reason":"stop"}],
-				 "usage":{"prompt_tokens":9,"completion_tokens":2,"total_tokens":11}}
-				""";
-		when(forwardingService.forward(any())).thenReturn(Mono.just(upstream));
+		when(forwardingService.forward(any())).thenReturn(Mono.just(new CanonicalChatResponse(
+				"chatcmpl-1", "gpt-4o-mini", "hello costpilot", "stop", new Usage(9, 2))));
 
 		mockMvc.perform(post("/v1/chat/completions")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -68,10 +67,11 @@ class ChatCompletionsContractTest {
 	@Test
 	void streamingRelaysSseChunksEndingWithDone() throws Exception {
 		when(forwardingService.forwardStream(any())).thenReturn(Flux.just(
-				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}",
-				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}",
-				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
-				"[DONE]"));
+				CanonicalStreamChunk.role("assistant"),
+				CanonicalStreamChunk.content("hello "),
+				CanonicalStreamChunk.content("costpilot"),
+				CanonicalStreamChunk.finish("stop"),
+				CanonicalStreamChunk.endOfStream()));
 		String body = VALID_BODY.replace("\"stream\": false", "\"stream\": true");
 
 		MvcResult started = mockMvc.perform(post("/v1/chat/completions")
