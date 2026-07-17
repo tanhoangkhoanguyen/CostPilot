@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+import com.costpilot.budget.BudgetScope;
+import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.Usage;
 import com.costpilot.domain.UsageRecord;
 import com.costpilot.domain.UsageRecordRepository;
@@ -21,9 +23,11 @@ public class UsageLedgerService {
 	private static final Logger log = LoggerFactory.getLogger(UsageLedgerService.class);
 
 	private final UsageRecordRepository repository;
+	private final BudgetService budgetService;
 
-	public UsageLedgerService(UsageRecordRepository repository) {
+	public UsageLedgerService(UsageRecordRepository repository, BudgetService budgetService) {
 		this.repository = repository;
+		this.budgetService = budgetService;
 	}
 
 	public UsageRecord record(LedgerContext context, String provider, String model, Usage usage, Cost cost,
@@ -33,7 +37,14 @@ public class UsageLedgerService {
 			return repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow();
 		}
 		try {
-			return insert(context, provider, model, usage, cost, priceId);
+			UsageRecord saved = insert(context, provider, model, usage, cost, priceId);
+			// live budget counters move only on a FRESH insert - ledger idempotency
+			// is exactly what makes the counters replay-safe (3.1)
+			budgetService.charge(BudgetScope.TENANT, saved.getTenantId(), cost.total());
+			budgetService.charge(BudgetScope.TEAM, saved.getTeamId(), cost.total());
+			budgetService.charge(BudgetScope.PROJECT, saved.getProjectId(), cost.total());
+			budgetService.charge(BudgetScope.MODEL, saved.getModel(), cost.total());
+			return saved;
 		} catch (DataIntegrityViolationException e) {
 			// concurrent replay lost the insert race - the money is already counted
 			log.info("ledger replay ignored (insert race) idempotencyKey={}", context.idempotencyKey());
