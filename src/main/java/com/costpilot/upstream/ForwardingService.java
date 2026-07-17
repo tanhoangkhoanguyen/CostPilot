@@ -1,5 +1,7 @@
 package com.costpilot.upstream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.http.MediaType;
@@ -19,6 +21,8 @@ import reactor.core.publisher.Mono;
 // the wire request and parse the response back to the canonical model.
 @Service
 public class ForwardingService {
+
+	private static final Logger log = LoggerFactory.getLogger(ForwardingService.class);
 
 	private final UpstreamProperties properties;
 	private final ProviderRegistry registry;
@@ -49,7 +53,11 @@ public class ForwardingService {
 				.accept(MediaType.TEXT_EVENT_STREAM)
 				.retrieve()
 				.bodyToFlux(String.class)
-				.flatMap(data -> adapter.parseStreamEvent(data).map(Flux::just).orElseGet(Flux::empty));
+				.flatMap(data -> adapter.parseStreamEvent(data).map(Flux::just).orElseGet(Flux::empty))
+				// disposal propagates here when the client disconnects mid-stream;
+				// cancelling the flux tears down the upstream HTTP connection
+				.doOnCancel(() -> log.info("upstream stream cancelled provider={} model={}",
+						adapter.providerId(), request.model()));
 	}
 
 	private WebClient.RequestHeadersSpec<?> exchange(ProviderAdapter adapter, CanonicalChatRequest request) {
