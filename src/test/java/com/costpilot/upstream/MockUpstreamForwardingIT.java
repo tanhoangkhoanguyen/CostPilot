@@ -39,6 +39,14 @@ class MockUpstreamForwardingIT {
 			}
 			""";
 
+	private static final String MODEL_BODY = """
+			{
+			  "model": "%s",
+			  "messages": [{"role": "user", "content": "hello costpilot"}],
+			  "stream": false
+			}
+			""";
+
 	@Test
 	void gatewayForwardsNonStreamingToMockAndRelaysResponse() {
 		ResponseEntity<String> response = restTemplate.exchange(
@@ -76,6 +84,30 @@ class MockUpstreamForwardingIT {
 		assertThat(String.join("\n", lines)).contains("chat.completion.chunk");
 		assertThat(String.join("\n", lines)).contains("[mock");
 		assertThat(lines.get(lines.size() - 1)).isEqualTo("data:[DONE]");
+	}
+
+	@Test
+	void claudeModelsRouteToAnthropicMockAndNormalizeBack() {
+		ResponseEntity<String> response = restTemplate.exchange(
+				"/v1/chat/completions", HttpMethod.POST,
+				jsonEntity(MODEL_BODY.formatted("claude-sonnet-4-5")), String.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).contains("[mock anthropic] hello costpilot");
+		assertThat(response.getBody()).contains("\"object\":\"chat.completion\"");
+		assertThat(response.getBody()).contains("\"prompt_tokens\"");
+	}
+
+	@Test
+	void geminiModelsRouteToGeminiMockAndNormalizeBack() {
+		ResponseEntity<String> response = restTemplate.exchange(
+				"/v1/chat/completions", HttpMethod.POST,
+				jsonEntity(MODEL_BODY.formatted("gemini-2.5-flash")), String.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody()).contains("[mock gemini] hello costpilot");
+		assertThat(response.getBody()).contains("\"object\":\"chat.completion\"");
+		assertThat(response.getBody()).contains("\"prompt_tokens\"");
 	}
 
 	private HttpEntity<String> jsonEntity(String body) {

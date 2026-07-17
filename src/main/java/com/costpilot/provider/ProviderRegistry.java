@@ -7,17 +7,21 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
+import com.costpilot.upstream.UpstreamProperties;
+
 // Discovers every ProviderAdapter bean via DI - adding a provider is implementing
-// the interface, nothing here changes. Model -> provider mapping is a prefix
-// heuristic until 1.2 makes it config-driven.
+// the interface, nothing here changes. Selection: explicit config mapping first
+// (costpilot.upstream.model-providers), then model-id prefix convention.
 @Component
 public class ProviderRegistry {
 
 	private final Map<String, ProviderAdapter> byId;
+	private final UpstreamProperties properties;
 
-	public ProviderRegistry(List<ProviderAdapter> adapters) {
+	public ProviderRegistry(List<ProviderAdapter> adapters, UpstreamProperties properties) {
 		this.byId = adapters.stream()
 				.collect(Collectors.toUnmodifiableMap(ProviderAdapter::providerId, Function.identity()));
+		this.properties = properties;
 	}
 
 	public ProviderAdapter byProviderId(String providerId) {
@@ -29,12 +33,16 @@ public class ProviderRegistry {
 	}
 
 	public ProviderAdapter forModel(String model) {
-		String m = model == null ? "" : model.toLowerCase();
-		if (m.startsWith("claude") && byId.containsKey("anthropic")) {
-			return byId.get("anthropic");
+		String configured = properties.getModelProviders().get(model);
+		if (configured != null) {
+			return byProviderId(configured);
 		}
-		if (m.startsWith("gemini") && byId.containsKey("gemini")) {
-			return byId.get("gemini");
+		String m = model == null ? "" : model.toLowerCase();
+		if (m.startsWith("claude")) {
+			return byProviderId("anthropic");
+		}
+		if (m.startsWith("gemini")) {
+			return byProviderId("gemini");
 		}
 		return byProviderId("openai");
 	}
