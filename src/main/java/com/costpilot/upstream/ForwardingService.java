@@ -17,7 +17,7 @@ import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
-import com.costpilot.cost.LedgerContext;
+import com.costpilot.cost.DecisionContext;
 import com.costpilot.cost.PriceNotFoundException;
 import com.costpilot.cost.StreamCostMeter;
 import com.costpilot.cost.UsageLedgerService;
@@ -55,7 +55,7 @@ public class ForwardingService {
 		this.webServerContext = webServerContext;
 	}
 
-	public Mono<CanonicalChatResponse> forward(CanonicalChatRequest request, LedgerContext ledgerContext) {
+	public Mono<CanonicalChatResponse> forward(CanonicalChatRequest request, DecisionContext decision) {
 		ProviderAdapter adapter = registry.forModel(request.model());
 		Instant requestedAt = Instant.now();
 		return exchange(adapter, request)
@@ -63,10 +63,10 @@ public class ForwardingService {
 				.retrieve()
 				.bodyToMono(String.class)
 				.map(adapter::parseResponse)
-				.doOnNext(response -> ledger(adapter, request, ledgerContext, response.usage(), requestedAt));
+				.doOnNext(response -> ledger(adapter, request, decision, response.usage(), requestedAt));
 	}
 
-	private void ledger(ProviderAdapter adapter, CanonicalChatRequest request, LedgerContext ledgerContext,
+	private void ledger(ProviderAdapter adapter, CanonicalChatRequest request, DecisionContext decision,
 			Usage usage, Instant requestedAt) {
 		if (usage == null) {
 			return;
@@ -74,7 +74,7 @@ public class ForwardingService {
 		try {
 			CostService.Priced priced = costService.pricedCostFor(
 					adapter.providerId(), request.model(), usage, requestedAt);
-			usageLedger.record(ledgerContext, adapter.providerId(), request.model(), usage,
+			usageLedger.record(decision.ledger(), adapter.providerId(), request.model(), usage,
 					priced.cost(), priced.price().getId());
 		} catch (PriceNotFoundException e) {
 			// unpriced model: nothing to ledger yet; the request itself must not
@@ -83,8 +83,8 @@ public class ForwardingService {
 		}
 	}
 
-	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, LedgerContext ledgerContext) {
-		return forwardStream(request, ledgerContext, null);
+	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, DecisionContext decision) {
+		return forwardStream(request, decision, null);
 	}
 
 	/**
@@ -93,7 +93,7 @@ public class ForwardingService {
 	 *            budget governs the request. When the accrued cost crosses it,
 	 *            the upstream is cancelled and a clean truncation is emitted (4.3).
 	 */
-	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, LedgerContext ledgerContext,
+	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, DecisionContext decision,
 			Long cutoffAllowanceNanos) {
 		ProviderAdapter adapter = registry.forModel(request.model());
 		Instant requestedAt = Instant.now();
@@ -124,6 +124,8 @@ public class ForwardingService {
 					}
 					boolean crossed = BudgetService.toNanos(meter.runningCost().total()) >= cutoffAllowanceNanos;
 					if (crossed && cutOff.compareAndSet(false, true)) {
+						// single writer: the audit row (5.1) reads this once in doFinally
+						decision.finishReason().set("budget_cutoff");
 						log.info("mid-stream cutoff model={} accruedTokens={} accruedCost={} allowance={}",
 								request.model(), meter.usage().totalTokens(),
 								meter.runningCost().total().toPlainString(),
@@ -144,7 +146,7 @@ public class ForwardingService {
 						log.info("stream meter final model={} inputTokens={} outputTokens={} cost={}",
 								request.model(), meter.usage().inputTokens(), meter.usage().outputTokens(),
 								meter.runningCost().total().toPlainString());
-						ledger(adapter, request, ledgerContext, meter.usage(), requestedAt);
+						ledger(adapter, request, decision, meter.usage(), requestedAt);
 					}
 				})
 				// disposal propagates here when the client disconnects mid-stream;

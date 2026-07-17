@@ -25,6 +25,7 @@ import com.costpilot.budget.DowngradeService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.cost.DecisionContext;
 import com.costpilot.cost.LedgerContext;
 import com.costpilot.policy.ApprovalRequiredException;
 import com.costpilot.policy.PolicyDecision;
@@ -80,6 +81,11 @@ public class ChatCompletionsController {
 				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
 
 		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);
+		// the model the client asked for, held across any downgrade so the audit trail
+		// (5.1) can record original-vs-executed
+		String requestedModel = canonical.model();
+		// the "why" accumulated across policy + budget; folded into DecisionContext below
+		DecisionContext decision = DecisionContext.allow(ledgerContext, requestedModel);
 
 		// policy first (3.3): who may use what. DENY/REQUIRE_APPROVAL throw 403;
 		// DOWNGRADE swaps the executed model before budget + forwarding
@@ -92,6 +98,8 @@ public class ChatCompletionsController {
 						canonical.model() + " -> " + policy.executedModel() + "; reason=policy");
 				canonical = new CanonicalChatRequest(policy.executedModel(), canonical.messages(),
 						canonical.maxTokens(), canonical.stream());
+				decision = DecisionContext.downgrade(ledgerContext, requestedModel, policy.executedModel(),
+						"policy", policy.matchedRuleId(), null);
 			}
 			case ALLOW -> {
 			}
@@ -112,16 +120,19 @@ public class ChatCompletionsController {
 					canonical.model() + " -> " + outcome.request().model() + "; reason=budget");
 			canonical = outcome.request();
 			guard = outcome.guard();
+			// original stays the client's requested model even if policy already downgraded once
+			decision = DecisionContext.downgrade(ledgerContext, requestedModel, outcome.request().model(),
+					"budget", null, blocked.getScope().dbValue());
 		}
 		if (guard.warning() != null) {
 			servletResponse.setHeader("X-CostPilot-Budget-Warning", guard.warning());
 		}
 
 		if (canonical.stream()) {
-			return relayStream(canonical, ledgerContext, guard, cutoffAllowance(guard));
+			return relayStream(canonical, decision, guard, cutoffAllowance(guard));
 		}
 		try {
-			CanonicalChatResponse upstream = forwardingService.forward(canonical, ledgerContext).block();
+			CanonicalChatResponse upstream = forwardingService.forward(canonical, decision).block();
 			return render(canonical, upstream);
 		} finally {
 			budgetGuard.release(guard);
@@ -183,7 +194,7 @@ public class ChatCompletionsController {
 		return allowance;
 	}
 
-	private SseEmitter relayStream(CanonicalChatRequest request, LedgerContext ledgerContext,
+	private SseEmitter relayStream(CanonicalChatRequest request, DecisionContext decision,
 			BudgetGuard.GuardResult guard, Long cutoffAllowanceNanos) {
 		String id = "chatcmpl-" + UUID.randomUUID();
 		long created = Instant.now().getEpochSecond();
@@ -193,7 +204,7 @@ public class ChatCompletionsController {
 		// upstream flux just completes
 		java.util.concurrent.atomic.AtomicBoolean doneSent = new java.util.concurrent.atomic.AtomicBoolean();
 		java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
-		Disposable subscription = forwardingService.forwardStream(request, ledgerContext, cutoffAllowanceNanos)
+		Disposable subscription = forwardingService.forwardStream(request, decision, cutoffAllowanceNanos)
 				.subscribe(
 				chunk -> sendChunk(emitter, id, created, request.model(), chunk, doneSent),
 				emitter::completeWithError,
