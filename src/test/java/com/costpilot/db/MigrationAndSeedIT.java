@@ -27,7 +27,7 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		assertThat(applied).isEqualTo(3);
+		assertThat(applied).isEqualTo(4);
 		assertThat(failed).isZero();
 	}
 
@@ -37,7 +37,11 @@ class MigrationAndSeedIT {
 		assertThat(jdbc.queryForObject("select name from tenant", String.class)).isEqualTo("acme");
 		assertThat(jdbc.queryForObject("select name from team", String.class)).isEqualTo("platform");
 		assertThat(jdbc.queryForObject("select name from project", String.class)).isEqualTo("chatbot");
-		assertThat(jdbc.queryForObject("select count(*) from model_price", Integer.class)).isEqualTo(6);
+		// count only the seeded pairs - other tests sharing this context may add prices
+		assertThat(jdbc.queryForObject("""
+				select count(*) from model_price where version = 1 and model in
+				('gpt-4o','gpt-4o-mini','claude-sonnet-4-5','claude-haiku-4-5','gemini-2.5-pro','gemini-2.5-flash')
+				""", Integer.class)).isEqualTo(6);
 	}
 
 	@Test
