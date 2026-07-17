@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.costpilot.api.dto.ErrorResponse;
 import com.costpilot.budget.BudgetExceededException;
+import com.costpilot.policy.ApprovalRequiredException;
+import com.costpilot.policy.PolicyDeniedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -34,6 +36,21 @@ public class GlobalExceptionHandler {
 		// 402: the org's budget says no - machine-readable type + scope code
 		return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
 				.body(ErrorResponse.budgetExceeded(ex.getMessage(), ex.getScope().dbValue()));
+	}
+
+	@ExceptionHandler(PolicyDeniedException.class)
+	ResponseEntity<ErrorResponse> handlePolicyDenied(PolicyDeniedException ex) {
+		return ResponseEntity.status(HttpStatus.FORBIDDEN)
+				.body(new ErrorResponse(new ErrorResponse.ErrorBody(
+						ex.getMessage(), "policy_denied", String.valueOf(ex.getDecision().matchedRuleId()))));
+	}
+
+	@ExceptionHandler(ApprovalRequiredException.class)
+	ResponseEntity<ErrorResponse> handleApprovalRequired(ApprovalRequiredException ex) {
+		// Stage 8 will park these instead of rejecting; the type is already stable
+		return ResponseEntity.status(HttpStatus.FORBIDDEN)
+				.body(new ErrorResponse(new ErrorResponse.ErrorBody(
+						ex.getMessage(), "approval_required", String.valueOf(ex.getDecision().matchedRuleId()))));
 	}
 
 	private ResponseEntity<ErrorResponse> badRequest(String message) {
