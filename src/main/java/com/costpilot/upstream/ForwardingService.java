@@ -68,8 +68,10 @@ public class ForwardingService {
 			return;
 		}
 		try {
-			Cost cost = costService.costFor(adapter.providerId(), request.model(), usage, requestedAt);
-			usageLedger.record(ledgerContext, adapter.providerId(), request.model(), usage, cost);
+			CostService.Priced priced = costService.pricedCostFor(
+					adapter.providerId(), request.model(), usage, requestedAt);
+			usageLedger.record(ledgerContext, adapter.providerId(), request.model(), usage,
+					priced.cost(), priced.price().getId());
 		} catch (PriceNotFoundException e) {
 			// unpriced model: nothing to ledger yet; the request itself must not
 			// fail over missing price data at this stage

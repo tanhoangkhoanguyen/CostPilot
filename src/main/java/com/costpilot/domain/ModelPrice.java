@@ -35,6 +35,17 @@ public class ModelPrice {
 	@Column(name = "output_price_per_1k", nullable = false, precision = 12, scale = 6)
 	private BigDecimal outputPricePer1k;
 
+	// versioning (2.3): a price change closes this row and inserts version+1;
+	// rows are immutable except for effective_to at close time
+	@Column(nullable = false)
+	private int version = 1;
+
+	@Column(name = "effective_from", nullable = false)
+	private Instant effectiveFrom = Instant.now();
+
+	@Column(name = "effective_to")
+	private Instant effectiveTo;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 
@@ -74,5 +85,31 @@ public class ModelPrice {
 
 	public Instant getCreatedAt() {
 		return createdAt;
+	}
+
+	public int getVersion() {
+		return version;
+	}
+
+	public Instant getEffectiveFrom() {
+		return effectiveFrom;
+	}
+
+	public Instant getEffectiveTo() {
+		return effectiveTo;
+	}
+
+	public boolean isClosed() {
+		return effectiveTo != null;
+	}
+
+	public ModelPrice asVersion(int version, Instant effectiveFrom) {
+		this.version = version;
+		this.effectiveFrom = effectiveFrom;
+		return this;
+	}
+
+	public void closeAt(Instant at) {
+		this.effectiveTo = at;
 	}
 }

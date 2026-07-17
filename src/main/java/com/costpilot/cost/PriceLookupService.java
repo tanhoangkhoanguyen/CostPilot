@@ -18,14 +18,13 @@ public class PriceLookupService {
 	}
 
 	/**
-	 * Price active at the given instant. The signature is effective-dated on
-	 * purpose: 2.3 introduces price versioning, and callers must already ask
-	 * "what did this cost at request time" rather than "what does it cost now".
-	 * Until 2.3 lands there is exactly one live row per (provider, model).
+	 * Price version active at the given instant - "what did this cost at request
+	 * time", never "what does it cost now". Historical instants resolve to the
+	 * version that was live back then, so old costs are reproducible forever.
 	 */
 	@Transactional(readOnly = true)
 	public ModelPrice priceAt(String provider, String model, Instant at) {
-		return repository.findByProviderAndModel(provider, model)
+		return repository.findActiveAt(provider, model, at)
 				.orElseThrow(() -> new PriceNotFoundException(provider, model));
 	}
 }
