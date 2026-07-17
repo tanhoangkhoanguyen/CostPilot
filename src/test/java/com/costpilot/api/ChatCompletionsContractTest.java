@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import com.costpilot.budget.BudgetGuard;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
@@ -34,6 +35,15 @@ class ChatCompletionsContractTest {
 
 	@MockitoBean
 	private ForwardingService forwardingService;
+
+	@MockitoBean
+	private BudgetGuard budgetGuard;
+
+	@org.junit.jupiter.api.BeforeEach
+	void guardAllowsByDefault() {
+		when(budgetGuard.reserve(any(), any()))
+				.thenReturn(new BudgetGuard.GuardResult(java.util.List.of(), null, false));
+	}
 
 	private static final String VALID_BODY = """
 			{
