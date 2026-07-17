@@ -23,6 +23,10 @@ import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.cost.LedgerContext;
+import com.costpilot.policy.ApprovalRequiredException;
+import com.costpilot.policy.PolicyDecision;
+import com.costpilot.policy.PolicyDeniedException;
+import com.costpilot.policy.PolicyService;
 import com.costpilot.upstream.ForwardingService;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,10 +43,13 @@ public class ChatCompletionsController {
 
 	private final ForwardingService forwardingService;
 	private final BudgetGuard budgetGuard;
+	private final PolicyService policyService;
 
-	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard) {
+	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
+			PolicyService policyService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
+		this.policyService = policyService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -66,6 +73,22 @@ public class ChatCompletionsController {
 				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
 
 		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);
+
+		// policy first (3.3): who may use what. DENY/REQUIRE_APPROVAL throw 403;
+		// DOWNGRADE swaps the executed model before budget + forwarding
+		PolicyDecision policy = policyService.evaluate(ledgerContext, canonical.model());
+		switch (policy.decision()) {
+			case DENY -> throw new PolicyDeniedException(policy, canonical.model());
+			case REQUIRE_APPROVAL -> throw new ApprovalRequiredException(policy, canonical.model());
+			case DOWNGRADE -> {
+				servletResponse.setHeader("X-CostPilot-Model-Downgraded",
+						canonical.model() + " -> " + policy.executedModel());
+				canonical = new CanonicalChatRequest(policy.executedModel(), canonical.messages(),
+						canonical.maxTokens(), canonical.stream());
+			}
+			case ALLOW -> {
+			}
+		}
 
 		// hot-path budget check: hard-block throws 402 out of here; soft limit
 		// serves the request with a warning header (3.2)
