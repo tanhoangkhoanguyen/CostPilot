@@ -21,6 +21,7 @@ import com.costpilot.api.dto.ChatMessage;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.cost.LedgerContext;
 import com.costpilot.upstream.ForwardingService;
 
 import jakarta.validation.Valid;
@@ -45,17 +46,25 @@ public class ChatCompletionsController {
 	public Object chatCompletions(
 			@Valid @RequestBody ChatCompletionRequest request,
 			@RequestHeader(value = "X-Team-ID", required = false) String teamId,
-			@RequestHeader(value = "X-Project-ID", required = false) String projectId) {
+			@RequestHeader(value = "X-Project-ID", required = false) String projectId,
+			@RequestHeader(value = "X-User-ID", required = false) String userId,
+			@RequestHeader(value = "X-Environment", required = false) String environment,
+			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
 		RequestContext context = RequestContext.of(teamId, projectId);
 		log.info("chat.completions team={} project={} model={} stream={}",
 				context.teamId(), context.projectId(), request.model(), request.isStreaming());
 
+		// client-supplied Idempotency-Key makes retries replay-safe in the ledger;
+		// without one, each request is its own ledger entry
+		LedgerContext ledgerContext = new LedgerContext(null, teamId, projectId, userId, environment,
+				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
+
 		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);
 		if (canonical.stream()) {
-			return relayStream(canonical);
+			return relayStream(canonical, ledgerContext);
 		}
-		CanonicalChatResponse upstream = forwardingService.forward(canonical).block();
+		CanonicalChatResponse upstream = forwardingService.forward(canonical, ledgerContext).block();
 		return render(canonical, upstream);
 	}
 
@@ -74,7 +83,7 @@ public class ChatCompletionsController {
 				usage);
 	}
 
-	private SseEmitter relayStream(CanonicalChatRequest request) {
+	private SseEmitter relayStream(CanonicalChatRequest request, LedgerContext ledgerContext) {
 		String id = "chatcmpl-" + UUID.randomUUID();
 		long created = Instant.now().getEpochSecond();
 		SseEmitter emitter = new SseEmitter(0L);
@@ -82,7 +91,7 @@ public class ChatCompletionsController {
 		// contract always ends with one, whether the adapter signals done or the
 		// upstream flux just completes
 		java.util.concurrent.atomic.AtomicBoolean doneSent = new java.util.concurrent.atomic.AtomicBoolean();
-		Disposable subscription = forwardingService.forwardStream(request).subscribe(
+		Disposable subscription = forwardingService.forwardStream(request, ledgerContext).subscribe(
 				chunk -> sendChunk(emitter, id, created, request.model(), chunk, doneSent),
 				emitter::completeWithError,
 				() -> finish(emitter, doneSent));
