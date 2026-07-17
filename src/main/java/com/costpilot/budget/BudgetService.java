@@ -51,6 +51,16 @@ public class BudgetService {
 		return "budget:remaining:" + scope.dbValue() + ":" + ref;
 	}
 
+	/** Budget limit mirrored next to the counter so the guard's Lua stays Redis-only. */
+	public static String limitKey(BudgetScope scope, String ref) {
+		return "budget:limit:" + scope.dbValue() + ":" + ref;
+	}
+
+	/** Short-lived negative cache: "no budget governs this scope", spares hot-path DB hits. */
+	public static String noneKey(BudgetScope scope, String ref) {
+		return "budget:none:" + scope.dbValue() + ":" + ref;
+	}
+
 	/**
 	 * Atomically deduct a charge from the live counter of every scope it hits.
 	 * Called once per fresh ledger insert - ledger idempotency is what keeps
@@ -98,6 +108,7 @@ public class BudgetService {
 		BigDecimal spent = spentFromLedger(scope, ref);
 		BigDecimal remaining = budget.getLimitAmount().subtract(spent);
 		String key = counterKey(scope, ref);
+		redis.opsForValue().set(limitKey(scope, ref), Long.toString(toNanos(budget.getLimitAmount())));
 		redis.opsForValue().setIfAbsent(key, Long.toString(toNanos(remaining)));
 		return fromNanos(Long.parseLong(redis.opsForValue().get(key)));
 	}
