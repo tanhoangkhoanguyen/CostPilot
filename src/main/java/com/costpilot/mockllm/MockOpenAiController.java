@@ -24,6 +24,10 @@ public class MockOpenAiController {
 
 	static final String MOCK_PREFIX = "[mock openai] ";
 
+	// paced streaming; tests with very long generations dial this down
+	@org.springframework.beans.factory.annotation.Value("${costpilot.mock-upstream.token-delay-ms:20}")
+	private long tokenDelayMs;
+
 	@PostMapping(value = "/mock/openai/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
 			MediaType.TEXT_EVENT_STREAM_VALUE })
 	public Object chatCompletions(@RequestBody ChatCompletionRequest request) throws IOException {
@@ -48,7 +52,7 @@ public class MockOpenAiController {
 			try {
 				send(emitter, chunk(id, created, model, new ChatCompletionChunk.Delta("assistant", null), null));
 				for (String token : content.split("(?<= )")) {
-					Thread.sleep(20); // paced so first token demonstrably beats completion (1.3)
+					Thread.sleep(tokenDelayMs); // paced so first token demonstrably beats completion (1.3)
 					send(emitter, chunk(id, created, model, new ChatCompletionChunk.Delta(null, token), null));
 				}
 				send(emitter, chunk(id, created, model, new ChatCompletionChunk.Delta(null, null), "stop"));
