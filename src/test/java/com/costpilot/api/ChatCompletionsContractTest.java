@@ -20,6 +20,8 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import com.costpilot.budget.BudgetGuard;
 import com.costpilot.core.model.CanonicalChatResponse;
+import com.costpilot.policy.PolicyDecision;
+import com.costpilot.policy.PolicyService;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.upstream.ForwardingService;
@@ -39,10 +41,15 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private BudgetGuard budgetGuard;
 
+	@MockitoBean
+	private PolicyService policyService;
+
 	@org.junit.jupiter.api.BeforeEach
-	void guardAllowsByDefault() {
+	void guardAndPolicyAllowByDefault() {
 		when(budgetGuard.reserve(any(), any()))
 				.thenReturn(new BudgetGuard.GuardResult(java.util.List.of(), null, false));
+		when(policyService.evaluate(any(), any()))
+				.thenAnswer(inv -> PolicyDecision.allowDefault(inv.getArgument(1)));
 	}
 
 	private static final String VALID_BODY = """
