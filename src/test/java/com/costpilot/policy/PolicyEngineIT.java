@@ -103,7 +103,7 @@ class PolicyEngineIT {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getHeaders().getFirst("X-CostPilot-Model-Downgraded"))
-				.isEqualTo("gpt-4o -> gpt-4o-mini");
+				.isEqualTo("gpt-4o -> gpt-4o-mini; reason=policy");
 		// executed (not requested) model everywhere downstream: mock echoes it,
 		// and the ledger bills it
 		assertThat(response.getBody()).contains("\"model\":\"gpt-4o-mini\"");

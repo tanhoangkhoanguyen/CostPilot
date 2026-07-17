@@ -18,7 +18,9 @@ import com.costpilot.api.dto.ChatCompletionChunk;
 import com.costpilot.api.dto.ChatCompletionRequest;
 import com.costpilot.api.dto.ChatCompletionResponse;
 import com.costpilot.api.dto.ChatMessage;
+import com.costpilot.budget.BudgetExceededException;
 import com.costpilot.budget.BudgetGuard;
+import com.costpilot.budget.DowngradeService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
@@ -44,12 +46,14 @@ public class ChatCompletionsController {
 	private final ForwardingService forwardingService;
 	private final BudgetGuard budgetGuard;
 	private final PolicyService policyService;
+	private final DowngradeService downgradeService;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
-			PolicyService policyService) {
+			PolicyService policyService, DowngradeService downgradeService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
+		this.downgradeService = downgradeService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -82,7 +86,7 @@ public class ChatCompletionsController {
 			case REQUIRE_APPROVAL -> throw new ApprovalRequiredException(policy, canonical.model());
 			case DOWNGRADE -> {
 				servletResponse.setHeader("X-CostPilot-Model-Downgraded",
-						canonical.model() + " -> " + policy.executedModel());
+						canonical.model() + " -> " + policy.executedModel() + "; reason=policy");
 				canonical = new CanonicalChatRequest(policy.executedModel(), canonical.messages(),
 						canonical.maxTokens(), canonical.stream());
 			}
@@ -90,9 +94,22 @@ public class ChatCompletionsController {
 			}
 		}
 
-		// hot-path budget check: hard-block throws 402 out of here; soft limit
-		// serves the request with a warning header (3.2)
-		BudgetGuard.GuardResult guard = budgetGuard.reserve(canonical, ledgerContext);
+		// hot-path budget check: hard-block triggers pre-flight auto-downgrade to a
+		// cheaper policy-allowed model (4.1); only when nothing fits does the 402
+		// escape. soft limit serves the request with a warning header (3.2)
+		BudgetGuard.GuardResult guard;
+		try {
+			guard = budgetGuard.reserve(canonical, ledgerContext);
+		} catch (BudgetExceededException blocked) {
+			DowngradeOutcome outcome = downgradeForBudget(canonical, ledgerContext, blocked);
+			// audit trail (persisted in 5.1): original vs executed + why
+			log.info("auto-downgrade reason=budget original={} executed={} blockedScope={}",
+					canonical.model(), outcome.request().model(), blocked.getScope().dbValue());
+			servletResponse.setHeader("X-CostPilot-Model-Downgraded",
+					canonical.model() + " -> " + outcome.request().model() + "; reason=budget");
+			canonical = outcome.request();
+			guard = outcome.guard();
+		}
 		if (guard.warning() != null) {
 			servletResponse.setHeader("X-CostPilot-Budget-Warning", guard.warning());
 		}
@@ -106,6 +123,29 @@ public class ChatCompletionsController {
 		} finally {
 			budgetGuard.release(guard);
 		}
+	}
+
+	private record DowngradeOutcome(CanonicalChatRequest request, BudgetGuard.GuardResult guard) {
+	}
+
+	/**
+	 * 4.1: the requested model does not fit the remaining budget - retry the
+	 * atomic reservation on cheaper policy-allowed models, cheapest first. If
+	 * nothing fits, the original 402 propagates.
+	 */
+	private DowngradeOutcome downgradeForBudget(CanonicalChatRequest canonical, LedgerContext ledgerContext,
+			BudgetExceededException blocked) {
+		for (DowngradeService.Candidate candidate : downgradeService
+				.cheaperAllowedAlternatives(canonical, ledgerContext).stream().limit(3).toList()) {
+			CanonicalChatRequest alternative = new CanonicalChatRequest(candidate.model(),
+					canonical.messages(), canonical.maxTokens(), canonical.stream());
+			try {
+				return new DowngradeOutcome(alternative, budgetGuard.reserve(alternative, ledgerContext));
+			} catch (BudgetExceededException stillBlocked) {
+				// try the next candidate
+			}
+		}
+		throw blocked;
 	}
 
 	private ChatCompletionResponse render(CanonicalChatRequest request, CanonicalChatResponse upstream) {

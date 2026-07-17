@@ -44,6 +44,9 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private PolicyService policyService;
 
+	@MockitoBean
+	private com.costpilot.budget.DowngradeService downgradeService;
+
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
 		when(budgetGuard.reserve(any(), any()))

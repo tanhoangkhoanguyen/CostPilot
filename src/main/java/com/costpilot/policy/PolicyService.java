@@ -52,6 +52,18 @@ public class PolicyService {
 	}
 
 	public PolicyDecision evaluate(LedgerContext context, String model) {
+		PolicyDecision decision = doEvaluate(context, model);
+		log.info("policy decision={} model={} executedModel={} rule={} reason=\"{}\"",
+				decision.decision(), model, decision.executedModel(), decision.matchedRuleId(), decision.reason());
+		return decision;
+	}
+
+	/** Quiet check used by candidate selection (4.1) - no decision log spam. */
+	public boolean allows(LedgerContext context, String model) {
+		return doEvaluate(context, model).decision() == PolicyDecision.Decision.ALLOW;
+	}
+
+	private PolicyDecision doEvaluate(LedgerContext context, String model) {
 		// project override wins over the team rule
 		CachedRule rule = null;
 		String matchedScope = null;
@@ -63,10 +75,7 @@ public class PolicyService {
 			rule = load("team", context.teamId());
 			matchedScope = "team=" + context.teamId();
 		}
-		PolicyDecision decision = decide(rule, matchedScope, model);
-		log.info("policy decision={} model={} executedModel={} rule={} reason=\"{}\"",
-				decision.decision(), model, decision.executedModel(), decision.matchedRuleId(), decision.reason());
-		return decision;
+		return decide(rule, matchedScope, model);
 	}
 
 	private PolicyDecision decide(CachedRule rule, String matchedScope, String model) {
