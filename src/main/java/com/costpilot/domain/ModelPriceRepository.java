@@ -18,4 +18,7 @@ public interface ModelPriceRepository extends JpaRepository<ModelPrice, UUID> {
 			""")
 	Optional<ModelPrice> findActiveAt(@Param("provider") String provider, @Param("model") String model,
 			@Param("at") Instant at);
+
+	@Query("select p from ModelPrice p where p.effectiveTo is null")
+	java.util.List<ModelPrice> findAllLive();
 }
