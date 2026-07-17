@@ -1,6 +1,8 @@
 package com.costpilot.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -12,14 +14,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+
+import com.costpilot.upstream.ForwardingService;
+
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @WebMvcTest(ChatCompletionsController.class)
 class ChatCompletionsContractTest {
 
 	@Autowired
 	private MockMvc mockMvc;
+
+	@MockitoBean
+	private ForwardingService forwardingService;
 
 	private static final String VALID_BODY = """
 			{
@@ -34,7 +45,14 @@ class ChatCompletionsContractTest {
 			""";
 
 	@Test
-	void nonStreamingReturnsSingleJsonEcho() throws Exception {
+	void nonStreamingRelaysUpstreamJson() throws Exception {
+		String upstream = """
+				{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-mini",
+				 "choices":[{"index":0,"message":{"role":"assistant","content":"hello costpilot"},"finish_reason":"stop"}],
+				 "usage":{"prompt_tokens":9,"completion_tokens":2,"total_tokens":11}}
+				""";
+		when(forwardingService.forward(any())).thenReturn(Mono.just(upstream));
+
 		mockMvc.perform(post("/v1/chat/completions")
 				.contentType(MediaType.APPLICATION_JSON)
 				.header("X-Team-ID", "team-a")
@@ -43,15 +61,17 @@ class ChatCompletionsContractTest {
 				.andExpect(status().isOk())
 				.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 				.andExpect(jsonPath("$.object").value("chat.completion"))
-				.andExpect(jsonPath("$.model").value("gpt-4o-mini"))
-				.andExpect(jsonPath("$.choices[0].message.role").value("assistant"))
 				.andExpect(jsonPath("$.choices[0].message.content").value("hello costpilot"))
-				.andExpect(jsonPath("$.choices[0].finish_reason").value("stop"))
-				.andExpect(jsonPath("$.usage.total_tokens").isNumber());
+				.andExpect(jsonPath("$.usage.total_tokens").value(11));
 	}
 
 	@Test
-	void streamingReturnsSseChunksEndingWithDone() throws Exception {
+	void streamingRelaysSseChunksEndingWithDone() throws Exception {
+		when(forwardingService.forwardStream(any())).thenReturn(Flux.just(
+				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}",
+				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{\"content\":\"hello \"}}]}",
+				"{\"object\":\"chat.completion.chunk\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}",
+				"[DONE]"));
 		String body = VALID_BODY.replace("\"stream\": false", "\"stream\": true");
 
 		MvcResult started = mockMvc.perform(post("/v1/chat/completions")

@@ -25,6 +25,17 @@ spring:
 server:
   port: 8080
 
+costpilot:
+  # Embedded mock LLM upstream - default upstream so dev + tests cost $0.
+  mock-upstream:
+    enabled: true
+  upstream:
+    # mock -> embedded mock server in this app; real -> provider endpoints below
+    mode: ${COSTPILOT_UPSTREAM_MODE:mock}
+    openai:
+      base-url: ${COSTPILOT_UPSTREAM_OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${COSTPILOT_UPSTREAM_OPENAI_API_KEY:}
+
 management:
   endpoints:
     web:
