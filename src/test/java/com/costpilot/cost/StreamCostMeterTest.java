@@ -17,7 +17,7 @@ class StreamCostMeterTest {
 	private final CostCalculator calculator = new CostCalculator();
 
 	private StreamCostMeter meter() {
-		return new StreamCostMeter(price, calculator);
+		return new StreamCostMeter(price, calculator, 0);
 	}
 
 	@Test

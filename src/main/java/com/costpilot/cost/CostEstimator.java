@@ -20,15 +20,20 @@ public class CostEstimator {
 	private static final BigDecimal CHARS_PER_TOKEN = new BigDecimal(3);
 
 	public Cost estimateMax(CanonicalChatRequest request, ModelPrice price) {
-		long chars = request.messages().stream()
-				.mapToLong(m -> m.content() == null ? 0 : m.content().length())
-				.sum();
-		BigDecimal inputTokens = new BigDecimal(chars).divide(CHARS_PER_TOKEN, 0, RoundingMode.UP);
+		BigDecimal inputTokens = BigDecimal.valueOf(estimateInputTokens(request));
 		BigDecimal outputTokens = BigDecimal.valueOf(
 				request.maxTokens() != null ? request.maxTokens() : DEFAULT_MAX_OUTPUT_TOKENS);
 
 		return new Cost(
 				price.getInputPricePer1k().multiply(inputTokens).divide(PER_TOKENS),
 				price.getOutputPricePer1k().multiply(outputTokens).divide(PER_TOKENS));
+	}
+
+	/** chars/3 heuristic - also seeds the stream meter's assumed input (4.2/4.3). */
+	public int estimateInputTokens(CanonicalChatRequest request) {
+		long chars = request.messages().stream()
+				.mapToLong(m -> m.content() == null ? 0 : m.content().length())
+				.sum();
+		return new BigDecimal(chars).divide(CHARS_PER_TOKEN, 0, RoundingMode.UP).intValueExact();
 	}
 }
