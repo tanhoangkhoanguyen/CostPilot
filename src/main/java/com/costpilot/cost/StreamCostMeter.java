@@ -20,14 +20,23 @@ public class StreamCostMeter {
 
 	private final ModelPrice price;
 	private final CostCalculator calculator;
+	/**
+	 * Pre-flight input estimate: most providers report usage only at stream END,
+	 * so mid-flight the input side would otherwise cost zero and a 4.3 cutoff
+	 * would fire too late. The estimate stands in (conservative) until the
+	 * provider reports; a cut-off stream that never got a usage event is billed
+	 * with the estimated input - documented behavior of partial records.
+	 */
+	private final int assumedInputTokens;
 
-	private final AtomicInteger inputTokens = new AtomicInteger();
+	private final AtomicInteger reportedInputTokens = new AtomicInteger();
 	private final AtomicInteger reportedOutputTokens = new AtomicInteger();
 	private final AtomicInteger countedOutputTokens = new AtomicInteger();
 
-	StreamCostMeter(ModelPrice price, CostCalculator calculator) {
+	StreamCostMeter(ModelPrice price, CostCalculator calculator, int assumedInputTokens) {
 		this.price = price;
 		this.calculator = calculator;
+		this.assumedInputTokens = assumedInputTokens;
 	}
 
 	public void observe(CanonicalStreamChunk chunk) {
@@ -35,15 +44,15 @@ public class StreamCostMeter {
 			countedOutputTokens.incrementAndGet();
 		}
 		if (chunk.usage() != null) {
-			inputTokens.accumulateAndGet(chunk.usage().inputTokens(), Math::max);
+			reportedInputTokens.accumulateAndGet(chunk.usage().inputTokens(), Math::max);
 			reportedOutputTokens.accumulateAndGet(chunk.usage().outputTokens(), Math::max);
 		}
 	}
 
-	/** Provider-reported wins once present; the count keeps accruing before that. */
+	/** Provider-reported wins once present; estimates/counts stand in before that. */
 	public Usage usage() {
-		return new Usage(inputTokens.get(),
-				Math.max(reportedOutputTokens.get(), countedOutputTokens.get()));
+		int input = reportedInputTokens.get() > 0 ? reportedInputTokens.get() : assumedInputTokens;
+		return new Usage(input, Math.max(reportedOutputTokens.get(), countedOutputTokens.get()));
 	}
 
 	public Cost runningCost() {

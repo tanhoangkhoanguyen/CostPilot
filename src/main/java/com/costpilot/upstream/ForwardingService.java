@@ -10,10 +10,12 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
+import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
 import com.costpilot.cost.LedgerContext;
 import com.costpilot.cost.PriceNotFoundException;
@@ -36,16 +38,19 @@ public class ForwardingService {
 	private final ProviderRegistry registry;
 	private final CostService costService;
 	private final UsageLedgerService usageLedger;
+	private final CostEstimator estimator;
 	private final WebClient webClient;
 	private final ObjectProvider<WebServerApplicationContext> webServerContext;
 
 	public ForwardingService(UpstreamProperties properties, ProviderRegistry registry,
-			CostService costService, UsageLedgerService usageLedger, WebClient.Builder webClientBuilder,
+			CostService costService, UsageLedgerService usageLedger, CostEstimator estimator,
+			WebClient.Builder webClientBuilder,
 			ObjectProvider<WebServerApplicationContext> webServerContext) {
 		this.properties = properties;
 		this.registry = registry;
 		this.costService = costService;
 		this.usageLedger = usageLedger;
+		this.estimator = estimator;
 		this.webClient = webClientBuilder.build();
 		this.webServerContext = webServerContext;
 	}
@@ -79,11 +84,23 @@ public class ForwardingService {
 	}
 
 	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, LedgerContext ledgerContext) {
+		return forwardStream(request, ledgerContext, null);
+	}
+
+	/**
+	 * @param cutoffAllowanceNanos the request's spend allowance (its reservation
+	 *            plus the scope's remaining at stream start), or null when no
+	 *            budget governs the request. When the accrued cost crosses it,
+	 *            the upstream is cancelled and a clean truncation is emitted (4.3).
+	 */
+	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, LedgerContext ledgerContext,
+			Long cutoffAllowanceNanos) {
 		ProviderAdapter adapter = registry.forModel(request.model());
 		Instant requestedAt = Instant.now();
 		// mid-stream metering (4.2): accrue cost token-by-token as chunks arrive,
 		// reconciled against provider-reported usage; unpriced models stream unmetered
 		StreamCostMeter meter = meterOrNull(adapter, request, requestedAt);
+		java.util.concurrent.atomic.AtomicBoolean cutOff = new java.util.concurrent.atomic.AtomicBoolean();
 		return exchange(adapter, request)
 				.accept(MediaType.TEXT_EVENT_STREAM)
 				.retrieve()
@@ -98,6 +115,26 @@ public class ForwardingService {
 						}
 					}
 				})
+				// 4.3 headline: the check runs per chunk, so generation stops within
+				// one token of crossing the allowance (bounded overshoot = 1 chunk).
+				// takeUntil emits the crossing chunk, then cancels the upstream.
+				.takeUntil(chunk -> {
+					if (meter == null || cutoffAllowanceNanos == null || chunk.done()) {
+						return false;
+					}
+					boolean crossed = BudgetService.toNanos(meter.runningCost().total()) >= cutoffAllowanceNanos;
+					if (crossed && cutOff.compareAndSet(false, true)) {
+						log.info("mid-stream cutoff model={} accruedTokens={} accruedCost={} allowance={}",
+								request.model(), meter.usage().totalTokens(),
+								meter.runningCost().total().toPlainString(),
+								BudgetService.fromNanos(cutoffAllowanceNanos).toPlainString());
+					}
+					return crossed;
+				})
+				// clean truncation, not a broken socket: finish_reason then [DONE]
+				.concatWith(Flux.defer(() -> cutOff.get()
+						? Flux.just(CanonicalStreamChunk.finish("budget_cutoff"), CanonicalStreamChunk.endOfStream())
+						: Flux.empty()))
 				// doFinally, not doOnComplete: the gateway disposes this subscription as
 				// soon as it relays [DONE], which cancels the flux before onComplete can
 				// fire. Whatever ends the stream - complete, cancel, error - if tokens
@@ -118,7 +155,8 @@ public class ForwardingService {
 
 	private StreamCostMeter meterOrNull(ProviderAdapter adapter, CanonicalChatRequest request, Instant at) {
 		try {
-			return costService.meter(adapter.providerId(), request.model(), at);
+			return costService.meter(adapter.providerId(), request.model(), at,
+					estimator.estimateInputTokens(request));
 		} catch (PriceNotFoundException e) {
 			log.warn("stream unmetered: {}", e.getMessage());
 			return null;

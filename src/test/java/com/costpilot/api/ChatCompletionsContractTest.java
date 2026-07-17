@@ -47,6 +47,9 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private com.costpilot.budget.DowngradeService downgradeService;
 
+	@MockitoBean
+	private com.costpilot.budget.BudgetService budgetService;
+
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
 		when(budgetGuard.reserve(any(), any()))
@@ -86,7 +89,7 @@ class ChatCompletionsContractTest {
 
 	@Test
 	void streamingRelaysSseChunksEndingWithDone() throws Exception {
-		when(forwardingService.forwardStream(any(), any())).thenReturn(Flux.just(
+		when(forwardingService.forwardStream(any(), any(), any())).thenReturn(Flux.just(
 				CanonicalStreamChunk.role("assistant"),
 				CanonicalStreamChunk.content("hello "),
 				CanonicalStreamChunk.content("costpilot"),

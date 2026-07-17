@@ -123,11 +123,17 @@ public class BudgetService {
 		};
 	}
 
-	static long toNanos(BigDecimal amount) {
+	/** Live remaining in nanodollars, or null when no counter exists (no rebuild attempted). */
+	public Long remainingNanos(BudgetScope scope, String ref) {
+		String value = redis.opsForValue().get(counterKey(scope, ref));
+		return value == null ? null : Long.parseLong(value);
+	}
+
+	public static long toNanos(BigDecimal amount) {
 		return amount.setScale(9, RoundingMode.HALF_UP).multiply(NANOS).longValueExact();
 	}
 
-	static BigDecimal fromNanos(long nanos) {
+	public static BigDecimal fromNanos(long nanos) {
 		return BigDecimal.valueOf(nanos).divide(NANOS);
 	}
 }

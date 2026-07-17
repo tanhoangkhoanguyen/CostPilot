@@ -20,6 +20,7 @@ import com.costpilot.api.dto.ChatCompletionResponse;
 import com.costpilot.api.dto.ChatMessage;
 import com.costpilot.budget.BudgetExceededException;
 import com.costpilot.budget.BudgetGuard;
+import com.costpilot.budget.BudgetService;
 import com.costpilot.budget.DowngradeService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
@@ -47,13 +48,15 @@ public class ChatCompletionsController {
 	private final BudgetGuard budgetGuard;
 	private final PolicyService policyService;
 	private final DowngradeService downgradeService;
+	private final BudgetService budgetService;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
-			PolicyService policyService, DowngradeService downgradeService) {
+			PolicyService policyService, DowngradeService downgradeService, BudgetService budgetService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
 		this.downgradeService = downgradeService;
+		this.budgetService = budgetService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -115,7 +118,7 @@ public class ChatCompletionsController {
 		}
 
 		if (canonical.stream()) {
-			return relayStream(canonical, ledgerContext, guard);
+			return relayStream(canonical, ledgerContext, guard, cutoffAllowance(guard));
 		}
 		try {
 			CanonicalChatResponse upstream = forwardingService.forward(canonical, ledgerContext).block();
@@ -163,8 +166,25 @@ public class ChatCompletionsController {
 				usage);
 	}
 
+	/**
+	 * The request's mid-stream spend allowance (4.3): its own reservation plus
+	 * whatever remained in the tightest governed scope at stream start. Null when
+	 * nothing governs the request - then there is nothing to cut off against.
+	 */
+	private Long cutoffAllowance(BudgetGuard.GuardResult guard) {
+		Long allowance = null;
+		for (BudgetGuard.Reservation reservation : guard.reservations()) {
+			Long remaining = budgetService.remainingNanos(reservation.scope(), reservation.ref());
+			if (remaining != null) {
+				long candidate = remaining + reservation.nanos();
+				allowance = allowance == null ? candidate : Math.min(allowance, candidate);
+			}
+		}
+		return allowance;
+	}
+
 	private SseEmitter relayStream(CanonicalChatRequest request, LedgerContext ledgerContext,
-			BudgetGuard.GuardResult guard) {
+			BudgetGuard.GuardResult guard, Long cutoffAllowanceNanos) {
 		String id = "chatcmpl-" + UUID.randomUUID();
 		long created = Instant.now().getEpochSecond();
 		SseEmitter emitter = new SseEmitter(0L);
@@ -173,7 +193,8 @@ public class ChatCompletionsController {
 		// upstream flux just completes
 		java.util.concurrent.atomic.AtomicBoolean doneSent = new java.util.concurrent.atomic.AtomicBoolean();
 		java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
-		Disposable subscription = forwardingService.forwardStream(request, ledgerContext).subscribe(
+		Disposable subscription = forwardingService.forwardStream(request, ledgerContext, cutoffAllowanceNanos)
+				.subscribe(
 				chunk -> sendChunk(emitter, id, created, request.model(), chunk, doneSent),
 				emitter::completeWithError,
 				() -> finish(emitter, doneSent));

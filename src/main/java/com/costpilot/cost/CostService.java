@@ -40,7 +40,7 @@ public class CostService {
 	}
 
 	/** A per-request running meter pinned to the price version active at `at` (4.2). */
-	public StreamCostMeter meter(String provider, String model, Instant at) {
-		return new StreamCostMeter(priceLookup.priceAt(provider, model, at), calculator);
+	public StreamCostMeter meter(String provider, String model, Instant at, int assumedInputTokens) {
+		return new StreamCostMeter(priceLookup.priceAt(provider, model, at), calculator, assumedInputTokens);
 	}
 }
