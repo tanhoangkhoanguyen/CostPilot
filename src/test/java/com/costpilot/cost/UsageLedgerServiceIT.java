@@ -48,9 +48,9 @@ class UsageLedgerServiceIT {
 	void replayingTheSameIdempotencyKeyDoesNotDoubleCount() {
 		String key = "replay-" + UUID.randomUUID();
 
-		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"));
-		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"));
-		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"));
+		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"), null);
+		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"), null);
+		ledger.record(context(key), "openai", "gpt-4o-mini", new Usage(2000, 1000), cost("0.0003", "0.0006"), null);
 
 		assertThat(repository.count()).isEqualTo(1);
 		assertThat(repository.totalCost()).isEqualByComparingTo("0.0009");
@@ -66,7 +66,7 @@ class UsageLedgerServiceIT {
 				pool.submit(() -> {
 					start.await();
 					ledger.record(context(key), "openai", "gpt-4o-mini",
-							new Usage(2000, 1000), cost("0.0003", "0.0006"));
+							new Usage(2000, 1000), cost("0.0003", "0.0006"), null);
 					return null;
 				});
 			}
@@ -89,7 +89,7 @@ class UsageLedgerServiceIT {
 				pool.submit(() -> {
 					start.await();
 					ledger.record(context(key), "openai", "gpt-4o-mini",
-							new Usage(1000, 1000), cost("0.00015", "0.0006"));
+							new Usage(1000, 1000), cost("0.00015", "0.0006"), null);
 					return null;
 				});
 			}
@@ -103,3 +103,4 @@ class UsageLedgerServiceIT {
 		assertThat(repository.totalCost()).isEqualByComparingTo("0.024");
 	}
 }
+

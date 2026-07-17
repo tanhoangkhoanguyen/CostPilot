@@ -49,6 +49,11 @@ public class UsageRecord {
 	@Column(nullable = false, precision = 18, scale = 9)
 	private BigDecimal cost;
 
+	// exact model_price row (version) that priced this request - historical costs
+	// stay reproducible after any price change (2.3)
+	@Column(name = "price_id")
+	private UUID priceId;
+
 	@Column(name = "idempotency_key", nullable = false, unique = true, columnDefinition = "text")
 	private String idempotencyKey;
 
@@ -60,7 +65,7 @@ public class UsageRecord {
 
 	public UsageRecord(String tenantId, String teamId, String projectId, String userId, String environment,
 			String provider, String model, int inputTokens, int outputTokens, BigDecimal cost,
-			String idempotencyKey) {
+			UUID priceId, String idempotencyKey) {
 		this.tenantId = tenantId;
 		this.teamId = teamId;
 		this.projectId = projectId;
@@ -71,6 +76,7 @@ public class UsageRecord {
 		this.inputTokens = inputTokens;
 		this.outputTokens = outputTokens;
 		this.cost = cost;
+		this.priceId = priceId;
 		this.idempotencyKey = idempotencyKey;
 	}
 
@@ -116,6 +122,10 @@ public class UsageRecord {
 
 	public BigDecimal getCost() {
 		return cost;
+	}
+
+	public UUID getPriceId() {
+		return priceId;
 	}
 
 	public String getIdempotencyKey() {
