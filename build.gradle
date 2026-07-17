@@ -31,6 +31,16 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	// 5.2: append-only usage events off the hot path
 	implementation 'org.springframework.kafka:spring-kafka'
+	// 5.3: OLAP sink. ClickHouse JDBC is a second, non-primary datasource - Flyway/JPA
+	// stay on Postgres. HikariCP comes transitively from spring-data-jpa. NOT the
+	// shaded-all classifier: it bundles an old Jackson that shadows Spring's and breaks
+	// unrelated JSON code (NoSuchMethodError). Use the thin jar + the apache http client
+	// and let Spring's managed Jackson win.
+	implementation('com.clickhouse:clickhouse-jdbc:0.7.2') {
+		exclude group: 'com.fasterxml.jackson.core'
+		exclude group: 'com.fasterxml.jackson.datatype'
+	}
+	runtimeOnly 'org.apache.httpcomponents.client5:httpclient5'
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
@@ -39,6 +49,7 @@ dependencies {
 	testImplementation 'org.testcontainers:postgresql'
 	testImplementation 'org.testcontainers:junit-jupiter'
 	testImplementation 'org.testcontainers:kafka'
+	testImplementation 'org.testcontainers:clickhouse'
 	testImplementation 'org.springframework.kafka:spring-kafka-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
