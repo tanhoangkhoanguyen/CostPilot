@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: costpilot
+  threads:
+    virtual:
+      enabled: true
+  # Postgres + Redis from docker-compose. No JDBC/Redis clients on the classpath
+  # yet (Stage 0.3 adds Flyway/JPA), so these are wiring targets, not live connections.
+  datasource:
+    url: jdbc:postgresql://${COSTPILOT_DB_HOST:localhost}:${COSTPILOT_DB_PORT:5432}/${COSTPILOT_DB_NAME:costpilot}
+    username: ${COSTPILOT_DB_USER:costpilot}
+    password: ${COSTPILOT_DB_PASSWORD:costpilot}
+  data:
+    redis:
+      host: ${COSTPILOT_REDIS_HOST:localhost}
+      port: ${COSTPILOT_REDIS_PORT:6379}
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
