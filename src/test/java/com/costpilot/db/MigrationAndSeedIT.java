@@ -27,7 +27,7 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		assertThat(applied).isEqualTo(4);
+		assertThat(applied).isEqualTo(5);
 		assertThat(failed).isZero();
 	}
 
