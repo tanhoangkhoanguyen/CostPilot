@@ -15,6 +15,7 @@ import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
+import com.costpilot.core.model.UsageEvent;
 import com.costpilot.cost.AuditService;
 import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
@@ -22,6 +23,8 @@ import com.costpilot.cost.DecisionContext;
 import com.costpilot.cost.PriceNotFoundException;
 import com.costpilot.cost.StreamCostMeter;
 import com.costpilot.cost.UsageLedgerService;
+import com.costpilot.domain.AuditRecord;
+import com.costpilot.kafka.UsageEventPublisher;
 import com.costpilot.provider.ProviderAdapter;
 import com.costpilot.provider.ProviderRegistry;
 
@@ -40,12 +43,15 @@ public class ForwardingService {
 	private final CostService costService;
 	private final UsageLedgerService usageLedger;
 	private final AuditService auditService;
+	// optional: present only when costpilot.kafka.enabled=true (5.2)
+	private final ObjectProvider<UsageEventPublisher> eventPublisher;
 	private final CostEstimator estimator;
 	private final WebClient webClient;
 	private final ObjectProvider<WebServerApplicationContext> webServerContext;
 
 	public ForwardingService(UpstreamProperties properties, ProviderRegistry registry,
 			CostService costService, UsageLedgerService usageLedger, AuditService auditService,
+			ObjectProvider<UsageEventPublisher> eventPublisher,
 			CostEstimator estimator, WebClient.Builder webClientBuilder,
 			ObjectProvider<WebServerApplicationContext> webServerContext) {
 		this.properties = properties;
@@ -53,6 +59,7 @@ public class ForwardingService {
 		this.costService = costService;
 		this.usageLedger = usageLedger;
 		this.auditService = auditService;
+		this.eventPublisher = eventPublisher;
 		this.estimator = estimator;
 		this.webClient = webClientBuilder.build();
 		this.webServerContext = webServerContext;
@@ -79,11 +86,13 @@ public class ForwardingService {
 					adapter.providerId(), request.model(), usage, requestedAt);
 			UsageLedgerService.LedgerResult result = usageLedger.record(decision.ledger(), adapter.providerId(),
 					request.model(), usage, priced.cost(), priced.price().getId());
-			// audit + (later) event only on a fresh insert - a replayed request is
-			// already audited, so this is exactly one audit row per forwarded request (5.1)
+			// audit + event only on a fresh insert - a replayed request is already
+			// recorded, so this is exactly one audit row / one usage event per forwarded
+			// request (5.1, 5.2), reusing the ledger's replay-safe gate
 			if (result.freshInsert()) {
-				auditService.recordForwarded(decision, adapter.providerId(), usage,
+				AuditRecord audit = auditService.recordForwarded(decision, adapter.providerId(), usage,
 						priced.cost().total(), result.record());
+				publishEvent(decision, adapter.providerId(), usage, priced.cost().total(), audit);
 			}
 		} catch (PriceNotFoundException e) {
 			// unpriced model: nothing to ledger yet; the request itself must not fail
@@ -92,6 +101,26 @@ public class ForwardingService {
 			log.warn("skipping ledger write: {}", e.getMessage());
 			auditService.recordForwarded(decision, adapter.providerId(), usage, null, null);
 		}
+	}
+
+	// Build the append-only usage event from the just-written audit row and publish it
+	// best-effort (5.2). No-op when Kafka is disabled (publisher bean absent). Cost is
+	// carried as exact integer nanodollars; the event timestamp is the audit row's
+	// created_at so windowed OLAP reconciliation lines up with the ledger.
+	private void publishEvent(DecisionContext decision, String provider, Usage usage, java.math.BigDecimal cost,
+			AuditRecord audit) {
+		UsageEventPublisher publisher = eventPublisher.getIfAvailable();
+		if (publisher == null) {
+			return;
+		}
+		com.costpilot.cost.LedgerContext ctx = decision.ledger();
+		UsageEvent event = new UsageEvent(
+				audit.getId(), ctx.tenantId(), ctx.teamId(), ctx.projectId(), ctx.userId(), ctx.environment(),
+				provider, decision.requestedModel(), decision.executedModel(),
+				audit.getDecision(), audit.getFinishReason(),
+				usage.inputTokens(), usage.outputTokens(),
+				BudgetService.toNanos(cost), audit.getCreatedAt());
+		publisher.publish(event);
 	}
 
 	public Flux<CanonicalStreamChunk> forwardStream(CanonicalChatRequest request, DecisionContext decision) {

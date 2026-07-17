@@ -21,11 +21,26 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  # 5.2: usage-event stream. Off by default so dev/tests without a broker still boot;
+  # docker-compose and real deploys set COSTPILOT_KAFKA_ENABLED=true.
+  kafka:
+    bootstrap-servers: ${COSTPILOT_KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 server:
   port: 8080
 
 costpilot:
+  # 5.2: append-only usage events -> Kafka (off the hot path). Disabled by default.
+  kafka:
+    enabled: ${COSTPILOT_KAFKA_ENABLED:false}
+    usage-events-topic: ${COSTPILOT_KAFKA_USAGE_TOPIC:costpilot.usage-events}
+    dlq-topic: ${COSTPILOT_KAFKA_DLQ_TOPIC:costpilot.usage-events.dlq}
   # Embedded mock LLM upstream - default upstream so dev + tests cost $0.
   mock-upstream:
     enabled: true
