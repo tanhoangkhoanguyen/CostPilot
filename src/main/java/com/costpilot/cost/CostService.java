@@ -22,11 +22,20 @@ public class CostService {
 		this.calculator = calculator;
 	}
 
-	public Cost costFor(String provider, String model, Usage usage, Instant at) {
+	/** Cost plus the exact price version that produced it. */
+	public record Priced(ModelPrice price, Cost cost) {
+	}
+
+	public Priced pricedCostFor(String provider, String model, Usage usage, Instant at) {
 		ModelPrice price = priceLookup.priceAt(provider, model, at);
 		Cost cost = calculator.calculate(price, usage);
-		log.info("cost provider={} model={} inputTokens={} outputTokens={} cost={}",
-				provider, model, usage.inputTokens(), usage.outputTokens(), cost.total().toPlainString());
-		return cost;
+		log.info("cost provider={} model={} priceVersion={} inputTokens={} outputTokens={} cost={}",
+				provider, model, price.getVersion(), usage.inputTokens(), usage.outputTokens(),
+				cost.total().toPlainString());
+		return new Priced(price, cost);
+	}
+
+	public Cost costFor(String provider, String model, Usage usage, Instant at) {
+		return pricedCostFor(provider, model, usage, at).cost();
 	}
 }
