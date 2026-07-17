@@ -38,4 +38,9 @@ public class CostService {
 	public Cost costFor(String provider, String model, Usage usage, Instant at) {
 		return pricedCostFor(provider, model, usage, at).cost();
 	}
+
+	/** A per-request running meter pinned to the price version active at `at` (4.2). */
+	public StreamCostMeter meter(String provider, String model, Instant at) {
+		return new StreamCostMeter(priceLookup.priceAt(provider, model, at), calculator);
+	}
 }
