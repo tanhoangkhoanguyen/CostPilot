@@ -50,6 +50,9 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private com.costpilot.budget.BudgetService budgetService;
 
+	@MockitoBean
+	private com.costpilot.cost.AuditService auditService;
+
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
 		when(budgetGuard.reserve(any(), any()))

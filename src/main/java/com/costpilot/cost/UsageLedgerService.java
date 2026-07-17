@@ -30,11 +30,19 @@ public class UsageLedgerService {
 		this.budgetService = budgetService;
 	}
 
-	public UsageRecord record(LedgerContext context, String provider, String model, Usage usage, Cost cost,
+	// Outcome of a ledger write. freshInsert is true only when THIS call actually
+	// inserted the row (and moved budget counters) - false on any replay. The audit
+	// trail (5.1) and usage events (5.2) gate on freshInsert so a retried request
+	// produces exactly one audit row / event, reusing the same guard that keeps the
+	// budget counters replay-safe.
+	public record LedgerResult(UsageRecord record, boolean freshInsert) {
+	}
+
+	public LedgerResult record(LedgerContext context, String provider, String model, Usage usage, Cost cost,
 			UUID priceId) {
 		if (repository.existsByIdempotencyKey(context.idempotencyKey())) {
 			log.info("ledger replay ignored idempotencyKey={}", context.idempotencyKey());
-			return repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow();
+			return new LedgerResult(repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow(), false);
 		}
 		try {
 			UsageRecord saved = insert(context, provider, model, usage, cost, priceId);
@@ -44,11 +52,11 @@ public class UsageLedgerService {
 			budgetService.charge(BudgetScope.TEAM, saved.getTeamId(), cost.total());
 			budgetService.charge(BudgetScope.PROJECT, saved.getProjectId(), cost.total());
 			budgetService.charge(BudgetScope.MODEL, saved.getModel(), cost.total());
-			return saved;
+			return new LedgerResult(saved, true);
 		} catch (DataIntegrityViolationException e) {
 			// concurrent replay lost the insert race - the money is already counted
 			log.info("ledger replay ignored (insert race) idempotencyKey={}", context.idempotencyKey());
-			return repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow();
+			return new LedgerResult(repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow(), false);
 		}
 	}
 

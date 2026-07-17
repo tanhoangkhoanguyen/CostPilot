@@ -15,6 +15,7 @@ import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
+import com.costpilot.cost.AuditService;
 import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
 import com.costpilot.cost.DecisionContext;
@@ -38,18 +39,20 @@ public class ForwardingService {
 	private final ProviderRegistry registry;
 	private final CostService costService;
 	private final UsageLedgerService usageLedger;
+	private final AuditService auditService;
 	private final CostEstimator estimator;
 	private final WebClient webClient;
 	private final ObjectProvider<WebServerApplicationContext> webServerContext;
 
 	public ForwardingService(UpstreamProperties properties, ProviderRegistry registry,
-			CostService costService, UsageLedgerService usageLedger, CostEstimator estimator,
-			WebClient.Builder webClientBuilder,
+			CostService costService, UsageLedgerService usageLedger, AuditService auditService,
+			CostEstimator estimator, WebClient.Builder webClientBuilder,
 			ObjectProvider<WebServerApplicationContext> webServerContext) {
 		this.properties = properties;
 		this.registry = registry;
 		this.costService = costService;
 		this.usageLedger = usageLedger;
+		this.auditService = auditService;
 		this.estimator = estimator;
 		this.webClient = webClientBuilder.build();
 		this.webServerContext = webServerContext;
@@ -74,12 +77,20 @@ public class ForwardingService {
 		try {
 			CostService.Priced priced = costService.pricedCostFor(
 					adapter.providerId(), request.model(), usage, requestedAt);
-			usageLedger.record(decision.ledger(), adapter.providerId(), request.model(), usage,
-					priced.cost(), priced.price().getId());
+			UsageLedgerService.LedgerResult result = usageLedger.record(decision.ledger(), adapter.providerId(),
+					request.model(), usage, priced.cost(), priced.price().getId());
+			// audit + (later) event only on a fresh insert - a replayed request is
+			// already audited, so this is exactly one audit row per forwarded request (5.1)
+			if (result.freshInsert()) {
+				auditService.recordForwarded(decision, adapter.providerId(), usage,
+						priced.cost().total(), result.record());
+			}
 		} catch (PriceNotFoundException e) {
-			// unpriced model: nothing to ledger yet; the request itself must not
-			// fail over missing price data at this stage
+			// unpriced model: nothing to ledger yet; the request itself must not fail
+			// over missing price data. still audit the decision (cost null) so every
+			// forwarded request is explainable (5.1).
 			log.warn("skipping ledger write: {}", e.getMessage());
+			auditService.recordForwarded(decision, adapter.providerId(), usage, null, null);
 		}
 	}
 

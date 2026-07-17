@@ -32,4 +32,18 @@ public record DecisionContext(
 		return new DecisionContext(ledger, requestedModel, executedModel, PolicyDecision.Decision.DOWNGRADE,
 				reason, matchedRuleId, blockedScope, new AtomicReference<>());
 	}
+
+	// A rejection (DENY / REQUIRE_APPROVAL): nothing executes, so executedModel is null.
+	public static DecisionContext rejected(LedgerContext ledger, String requestedModel,
+			PolicyDecision.Decision decision, String reason, java.util.UUID matchedRuleId) {
+		return new DecisionContext(ledger, requestedModel, null, decision, reason, matchedRuleId, null,
+				new AtomicReference<>());
+	}
+
+	// A budget hard-block that escapes as 402 (no cheaper model fit): audited as a
+	// denial with reason=budget and the scope that blocked it, so the 402 is explainable.
+	public static DecisionContext budgetBlocked(LedgerContext ledger, String requestedModel, String blockedScope) {
+		return new DecisionContext(ledger, requestedModel, null, PolicyDecision.Decision.DENY, "budget", null,
+				blockedScope, new AtomicReference<>());
+	}
 }

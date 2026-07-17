@@ -25,6 +25,7 @@ import com.costpilot.budget.DowngradeService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.cost.AuditService;
 import com.costpilot.cost.DecisionContext;
 import com.costpilot.cost.LedgerContext;
 import com.costpilot.policy.ApprovalRequiredException;
@@ -50,14 +51,17 @@ public class ChatCompletionsController {
 	private final PolicyService policyService;
 	private final DowngradeService downgradeService;
 	private final BudgetService budgetService;
+	private final AuditService auditService;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
-			PolicyService policyService, DowngradeService downgradeService, BudgetService budgetService) {
+			PolicyService policyService, DowngradeService downgradeService, BudgetService budgetService,
+			AuditService auditService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
 		this.downgradeService = downgradeService;
 		this.budgetService = budgetService;
+		this.auditService = auditService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -91,8 +95,16 @@ public class ChatCompletionsController {
 		// DOWNGRADE swaps the executed model before budget + forwarding
 		PolicyDecision policy = policyService.evaluate(ledgerContext, canonical.model());
 		switch (policy.decision()) {
-			case DENY -> throw new PolicyDeniedException(policy, canonical.model());
-			case REQUIRE_APPROVAL -> throw new ApprovalRequiredException(policy, canonical.model());
+			case DENY -> {
+				// audit before throwing: a denied request never forwards, but 5.1 still
+				// requires a queryable row explaining why it was blocked
+				auditService.recordRejected(rejectedContext(ledgerContext, requestedModel, policy));
+				throw new PolicyDeniedException(policy, canonical.model());
+			}
+			case REQUIRE_APPROVAL -> {
+				auditService.recordRejected(rejectedContext(ledgerContext, requestedModel, policy));
+				throw new ApprovalRequiredException(policy, canonical.model());
+			}
 			case DOWNGRADE -> {
 				servletResponse.setHeader("X-CostPilot-Model-Downgraded",
 						canonical.model() + " -> " + policy.executedModel() + "; reason=policy");
@@ -112,7 +124,16 @@ public class ChatCompletionsController {
 		try {
 			guard = budgetGuard.reserve(canonical, ledgerContext);
 		} catch (BudgetExceededException blocked) {
-			DowngradeOutcome outcome = downgradeForBudget(canonical, ledgerContext, blocked);
+			DowngradeOutcome outcome;
+			try {
+				outcome = downgradeForBudget(canonical, ledgerContext, blocked);
+			} catch (BudgetExceededException nothingFits) {
+				// no cheaper model fits: the 402 escapes, but 5.1 still needs a row
+				// explaining that budget blocked this request
+				auditService.recordRejected(DecisionContext.budgetBlocked(ledgerContext, requestedModel,
+						nothingFits.getScope().dbValue()));
+				throw nothingFits;
+			}
 			// audit trail (persisted in 5.1): original vs executed + why
 			log.info("auto-downgrade reason=budget original={} executed={} blockedScope={}",
 					canonical.model(), outcome.request().model(), blocked.getScope().dbValue());
@@ -140,6 +161,14 @@ public class ChatCompletionsController {
 	}
 
 	private record DowngradeOutcome(CanonicalChatRequest request, BudgetGuard.GuardResult guard) {
+	}
+
+	// DENY / REQUIRE_APPROVAL never forward - build the decision context for the audit
+	// row straight from the policy verdict.
+	private static DecisionContext rejectedContext(LedgerContext ledgerContext, String requestedModel,
+			PolicyDecision policy) {
+		return DecisionContext.rejected(ledgerContext, requestedModel, policy.decision(),
+				policy.reason(), policy.matchedRuleId());
 	}
 
 	/**
