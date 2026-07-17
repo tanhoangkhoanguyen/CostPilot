@@ -49,7 +49,7 @@ class ChatCompletionsContractTest {
 
 	@Test
 	void nonStreamingRelaysUpstreamJson() throws Exception {
-		when(forwardingService.forward(any())).thenReturn(Mono.just(new CanonicalChatResponse(
+		when(forwardingService.forward(any(), any())).thenReturn(Mono.just(new CanonicalChatResponse(
 				"chatcmpl-1", "gpt-4o-mini", "hello costpilot", "stop", new Usage(9, 2))));
 
 		mockMvc.perform(post("/v1/chat/completions")
@@ -66,7 +66,7 @@ class ChatCompletionsContractTest {
 
 	@Test
 	void streamingRelaysSseChunksEndingWithDone() throws Exception {
-		when(forwardingService.forwardStream(any())).thenReturn(Flux.just(
+		when(forwardingService.forwardStream(any(), any())).thenReturn(Flux.just(
 				CanonicalStreamChunk.role("assistant"),
 				CanonicalStreamChunk.content("hello "),
 				CanonicalStreamChunk.content("costpilot"),

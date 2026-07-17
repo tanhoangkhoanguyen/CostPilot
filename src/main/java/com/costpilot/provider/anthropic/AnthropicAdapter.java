@@ -100,7 +100,13 @@ public class AnthropicAdapter implements ProviderAdapter {
 		JsonNode root = read(data);
 		String type = root.path("type").asText("");
 		return switch (type) {
-			case "message_start" -> Optional.of(CanonicalStreamChunk.role("assistant"));
+			case "message_start" -> {
+				// input tokens ride on message_start; output arrives later in message_delta
+				JsonNode startUsage = root.path("message").path("usage");
+				Usage u = startUsage.isMissingNode() ? null
+						: new Usage(startUsage.path("input_tokens").asInt(0), 0);
+				yield Optional.of(new CanonicalStreamChunk("assistant", null, null, u, false));
+			}
 			case "content_block_delta" -> {
 				JsonNode delta = root.path("delta");
 				yield "text_delta".equals(delta.path("type").asText())
