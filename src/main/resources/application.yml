@@ -30,11 +30,22 @@ costpilot:
   mock-upstream:
     enabled: true
   upstream:
-    # mock -> embedded mock server in this app; real -> provider endpoints below
+    # mock -> embedded mock server in this app; real -> provider endpoints below.
+    # switching provider endpoints is env/config only - never a code change.
     mode: ${COSTPILOT_UPSTREAM_MODE:mock}
-    openai:
-      base-url: ${COSTPILOT_UPSTREAM_OPENAI_BASE_URL:https://api.openai.com}
-      api-key: ${COSTPILOT_UPSTREAM_OPENAI_API_KEY:}
+    providers:
+      openai:
+        base-url: ${COSTPILOT_UPSTREAM_OPENAI_BASE_URL:https://api.openai.com}
+        api-key: ${COSTPILOT_UPSTREAM_OPENAI_API_KEY:}
+      anthropic:
+        base-url: ${COSTPILOT_UPSTREAM_ANTHROPIC_BASE_URL:https://api.anthropic.com}
+        api-key: ${COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY:}
+      gemini:
+        base-url: ${COSTPILOT_UPSTREAM_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+        api-key: ${COSTPILOT_UPSTREAM_GEMINI_API_KEY:}
+    # explicit model -> provider overrides; anything unlisted falls back to
+    # model-id prefix convention (claude* -> anthropic, gemini* -> gemini, else openai)
+    model-providers: {}
 
 management:
   endpoints:
