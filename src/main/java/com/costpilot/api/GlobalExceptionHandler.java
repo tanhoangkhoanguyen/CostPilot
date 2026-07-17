@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.costpilot.api.dto.ErrorResponse;
+import com.costpilot.budget.BudgetExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -26,6 +27,13 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex) {
 		return badRequest("malformed request body: expected valid JSON matching the chat completions schema");
+	}
+
+	@ExceptionHandler(BudgetExceededException.class)
+	ResponseEntity<ErrorResponse> handleBudgetExceeded(BudgetExceededException ex) {
+		// 402: the org's budget says no - machine-readable type + scope code
+		return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+				.body(ErrorResponse.budgetExceeded(ex.getMessage(), ex.getScope().dbValue()));
 	}
 
 	private ResponseEntity<ErrorResponse> badRequest(String message) {

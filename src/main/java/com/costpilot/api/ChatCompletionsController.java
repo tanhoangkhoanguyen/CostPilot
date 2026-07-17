@@ -18,12 +18,14 @@ import com.costpilot.api.dto.ChatCompletionChunk;
 import com.costpilot.api.dto.ChatCompletionRequest;
 import com.costpilot.api.dto.ChatCompletionResponse;
 import com.costpilot.api.dto.ChatMessage;
+import com.costpilot.budget.BudgetGuard;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.cost.LedgerContext;
 import com.costpilot.upstream.ForwardingService;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import reactor.core.Disposable;
 
@@ -36,9 +38,11 @@ public class ChatCompletionsController {
 	private static final Logger log = LoggerFactory.getLogger(ChatCompletionsController.class);
 
 	private final ForwardingService forwardingService;
+	private final BudgetGuard budgetGuard;
 
-	public ChatCompletionsController(ForwardingService forwardingService) {
+	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard) {
 		this.forwardingService = forwardingService;
+		this.budgetGuard = budgetGuard;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -49,7 +53,8 @@ public class ChatCompletionsController {
 			@RequestHeader(value = "X-Project-ID", required = false) String projectId,
 			@RequestHeader(value = "X-User-ID", required = false) String userId,
 			@RequestHeader(value = "X-Environment", required = false) String environment,
-			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+			HttpServletResponse servletResponse) {
 
 		RequestContext context = RequestContext.of(teamId, projectId);
 		log.info("chat.completions team={} project={} model={} stream={}",
@@ -61,11 +66,23 @@ public class ChatCompletionsController {
 				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
 
 		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);
-		if (canonical.stream()) {
-			return relayStream(canonical, ledgerContext);
+
+		// hot-path budget check: hard-block throws 402 out of here; soft limit
+		// serves the request with a warning header (3.2)
+		BudgetGuard.GuardResult guard = budgetGuard.reserve(canonical, ledgerContext);
+		if (guard.warning() != null) {
+			servletResponse.setHeader("X-CostPilot-Budget-Warning", guard.warning());
 		}
-		CanonicalChatResponse upstream = forwardingService.forward(canonical, ledgerContext).block();
-		return render(canonical, upstream);
+
+		if (canonical.stream()) {
+			return relayStream(canonical, ledgerContext, guard);
+		}
+		try {
+			CanonicalChatResponse upstream = forwardingService.forward(canonical, ledgerContext).block();
+			return render(canonical, upstream);
+		} finally {
+			budgetGuard.release(guard);
+		}
 	}
 
 	private ChatCompletionResponse render(CanonicalChatRequest request, CanonicalChatResponse upstream) {
@@ -83,7 +100,8 @@ public class ChatCompletionsController {
 				usage);
 	}
 
-	private SseEmitter relayStream(CanonicalChatRequest request, LedgerContext ledgerContext) {
+	private SseEmitter relayStream(CanonicalChatRequest request, LedgerContext ledgerContext,
+			BudgetGuard.GuardResult guard) {
 		String id = "chatcmpl-" + UUID.randomUUID();
 		long created = Instant.now().getEpochSecond();
 		SseEmitter emitter = new SseEmitter(0L);
@@ -91,14 +109,21 @@ public class ChatCompletionsController {
 		// contract always ends with one, whether the adapter signals done or the
 		// upstream flux just completes
 		java.util.concurrent.atomic.AtomicBoolean doneSent = new java.util.concurrent.atomic.AtomicBoolean();
+		java.util.concurrent.atomic.AtomicBoolean released = new java.util.concurrent.atomic.AtomicBoolean();
 		Disposable subscription = forwardingService.forwardStream(request, ledgerContext).subscribe(
 				chunk -> sendChunk(emitter, id, created, request.model(), chunk, doneSent),
 				emitter::completeWithError,
 				() -> finish(emitter, doneSent));
-		// client went away -> stop pulling from the upstream
-		emitter.onCompletion(subscription::dispose);
-		emitter.onTimeout(subscription::dispose);
-		emitter.onError(t -> subscription.dispose());
+		Runnable settle = () -> {
+			subscription.dispose();
+			if (released.compareAndSet(false, true)) {
+				budgetGuard.release(guard);
+			}
+		};
+		// client went away -> stop pulling from the upstream, give the reservation back
+		emitter.onCompletion(settle);
+		emitter.onTimeout(settle);
+		emitter.onError(t -> settle.run());
 		return emitter;
 	}
 
