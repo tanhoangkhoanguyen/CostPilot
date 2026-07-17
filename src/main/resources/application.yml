@@ -41,6 +41,13 @@ costpilot:
     enabled: ${COSTPILOT_KAFKA_ENABLED:false}
     usage-events-topic: ${COSTPILOT_KAFKA_USAGE_TOPIC:costpilot.usage-events}
     dlq-topic: ${COSTPILOT_KAFKA_DLQ_TOPIC:costpilot.usage-events.dlq}
+  # 5.3/5.4: OLAP sink + read side. Second, non-primary datasource - Flyway/JPA stay on
+  # Postgres. Disabled by default so dev/tests without ClickHouse still boot.
+  clickhouse:
+    enabled: ${COSTPILOT_CLICKHOUSE_ENABLED:false}
+    jdbc-url: jdbc:ch://${COSTPILOT_CLICKHOUSE_HOST:localhost}:${COSTPILOT_CLICKHOUSE_PORT:8123}/costpilot
+    username: ${COSTPILOT_CLICKHOUSE_USER:default}
+    password: ${COSTPILOT_CLICKHOUSE_PASSWORD:}
   # Embedded mock LLM upstream - default upstream so dev + tests cost $0.
   mock-upstream:
     enabled: true
