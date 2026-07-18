@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
+import com.costpilot.security.AuthTestSupport;
 import com.costpilot.domain.UsageRecordRepository;
 
 // 5.2 acceptance: Kafka down => request still succeeds. Kafka is enabled but points at
@@ -44,6 +45,7 @@ class KafkaDownDoesNotFailRequestIT {
 		String team = "kafka-down-" + UUID.randomUUID();
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.set("X-Team-ID", team);
 		String body = """
 				{

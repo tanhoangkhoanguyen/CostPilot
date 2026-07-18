@@ -29,7 +29,12 @@ class CostpilotApplicationTests {
 
 	@Test
 	void requestThreadsAreVirtual() {
-		ResponseEntity<String> response = restTemplate.getForEntity("/test/thread-info", String.class);
+		// 6.1: /test/thread-info is now behind auth like any non-permitted path
+		ResponseEntity<String> response = restTemplate.exchange("/test/thread-info",
+				org.springframework.http.HttpMethod.GET,
+				new org.springframework.http.HttpEntity<>(
+						com.costpilot.security.AuthTestSupport.admin()),
+				String.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		assertThat(response.getBody()).startsWith("virtual=true");
 	}

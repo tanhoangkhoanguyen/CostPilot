@@ -18,19 +18,55 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+
 import com.costpilot.budget.BudgetGuard;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.policy.PolicyDecision;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
+import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.upstream.ForwardingService;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.boot.test.context.TestConfiguration;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+// 6.1: this is a controller contract slice - it mocks the governance beans and does NOT
+// exercise the real API-key filter (that's covered by AuthIT). Security is on the
+// classpath, so the slice needs a permissive chain plus an injected principal, since the
+// controller now reads identity from CurrentPrincipal instead of trusting X-Team-ID.
 @WebMvcTest(ChatCompletionsController.class)
+@Import(ChatCompletionsContractTest.PermitAllSecurity.class)
 class ChatCompletionsContractTest {
+
+	@TestConfiguration
+	static class PermitAllSecurity {
+		@Bean
+		SecurityFilterChain testChain(HttpSecurity http) throws Exception {
+			http.csrf(AbstractHttpConfigurer::disable)
+					.authorizeHttpRequests(a -> a.anyRequest().permitAll());
+			return http.build();
+		}
+	}
+
+	// an admin principal so the tests' X-Team-ID='team-a' impersonation resolves as before
+	private static Authentication adminPrincipal() {
+		AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+				"acme", "platform", "chatbot", java.util.UUID.randomUUID(), true);
+		return new UsernamePasswordAuthenticationToken(principal, null,
+				java.util.List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+	}
 
 	@Autowired
 	private MockMvc mockMvc;
@@ -79,6 +115,7 @@ class ChatCompletionsContractTest {
 				"chatcmpl-1", "gpt-4o-mini", "hello costpilot", "stop", new Usage(9, 2))));
 
 		mockMvc.perform(post("/v1/chat/completions")
+				.with(authentication(adminPrincipal()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.header("X-Team-ID", "team-a")
 				.header("X-Project-ID", "project-x")
@@ -101,6 +138,7 @@ class ChatCompletionsContractTest {
 		String body = VALID_BODY.replace("\"stream\": false", "\"stream\": true");
 
 		MvcResult started = mockMvc.perform(post("/v1/chat/completions")
+				.with(authentication(adminPrincipal()))
 				.contentType(MediaType.APPLICATION_JSON)
 				.content(body))
 				.andExpect(request().asyncStarted())

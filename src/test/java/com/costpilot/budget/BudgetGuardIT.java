@@ -40,6 +40,7 @@ import com.costpilot.domain.Budget;
 import com.costpilot.domain.BudgetRepository;
 import com.costpilot.domain.UsageRecordRepository;
 import com.costpilot.provider.ProviderRegistry;
+import com.costpilot.security.AuthTestSupport;
 
 // 3.2 acceptance: hard cap -> 402 machine-readable; soft (>=80% used) -> served +
 // warning header; concurrent flood cannot overspend; redis down -> fail-open; <5ms.
@@ -83,6 +84,7 @@ class BudgetGuardIT {
 
 	private ResponseEntity<String> post(String team, int maxTokens) {
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.set("X-Team-ID", team);
 		return restTemplate.exchange("/v1/chat/completions", HttpMethod.POST,

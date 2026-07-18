@@ -31,6 +31,7 @@ import com.costpilot.domain.Budget;
 import com.costpilot.domain.BudgetRepository;
 import com.costpilot.domain.UsageRecordRepository;
 import com.costpilot.policy.PolicyService;
+import com.costpilot.security.AuthTestSupport;
 
 // 4.1 acceptance: estimate within tolerance of actual on fixtures; an over-budget
 // request is served on a cheaper policy-allowed model; original vs executed + reason recorded.
@@ -72,6 +73,7 @@ class PreflightDowngradeIT {
 
 	private ResponseEntity<String> post(String team, String model, int maxTokens) {
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.set("X-Team-ID", team);
 		return restTemplate.exchange("/v1/chat/completions", HttpMethod.POST,

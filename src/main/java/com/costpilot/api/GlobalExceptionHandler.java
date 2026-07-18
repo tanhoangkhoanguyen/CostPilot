@@ -13,6 +13,7 @@ import com.costpilot.api.dto.ErrorResponse;
 import com.costpilot.budget.BudgetExceededException;
 import com.costpilot.policy.ApprovalRequiredException;
 import com.costpilot.policy.PolicyDeniedException;
+import com.costpilot.security.InvalidApiKeyException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -29,6 +30,14 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	ResponseEntity<ErrorResponse> handleUnreadable(HttpMessageNotReadableException ex) {
 		return badRequest("malformed request body: expected valid JSON matching the chat completions schema");
+	}
+
+	@ExceptionHandler(InvalidApiKeyException.class)
+	ResponseEntity<ErrorResponse> handleInvalidApiKey(InvalidApiKeyException ex) {
+		// 401: missing/unknown/revoked key that slipped past the filter into a controller
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.body(new ErrorResponse(new ErrorResponse.ErrorBody(
+						ex.getMessage(), "unauthorized", null)));
 	}
 
 	@ExceptionHandler(BudgetExceededException.class)

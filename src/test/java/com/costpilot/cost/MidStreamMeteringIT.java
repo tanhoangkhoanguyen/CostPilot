@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.costpilot.TestcontainersConfiguration;
+import com.costpilot.security.AuthTestSupport;
 import com.costpilot.domain.UsageRecord;
 import com.costpilot.domain.UsageRecordRepository;
 
@@ -49,6 +50,7 @@ class MidStreamMeteringIT {
 				.contentType(MediaType.APPLICATION_JSON)
 				.accept(MediaType.TEXT_EVENT_STREAM)
 				.header("X-Team-ID", team)
+				.header("Authorization", "Bearer " + AuthTestSupport.ADMIN_KEY)
 				.bodyValue(body)
 				.retrieve()
 				.bodyToFlux(String.class)

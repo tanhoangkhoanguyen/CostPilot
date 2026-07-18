@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.security.AuthTestSupport;
 
 // 3.3 acceptance: rule changes apply without redeploy, every decision is logged
 // with the matched rule, deny -> 403 with reason, downgrade swaps the executed model.
@@ -48,6 +49,7 @@ class PolicyEngineIT {
 
 	private ResponseEntity<String> post(String team, String project, String model) {
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		if (team != null) {
 			headers.set("X-Team-ID", team);

@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
+import com.costpilot.security.AuthTestSupport;
 
 // End-to-end: gateway -> embedded mock LLM upstream -> back through the gateway.
 // No network beyond localhost, no provider keys, fully deterministic.
@@ -62,6 +63,7 @@ class MockUpstreamForwardingIT {
 	void streamingPassthroughFromMockWorksEndToEnd() {
 		List<String> lines = restTemplate.execute("/v1/chat/completions", HttpMethod.POST,
 				request -> {
+					request.getHeaders().setBearerAuth(AuthTestSupport.ADMIN_KEY);
 					request.getHeaders().setContentType(MediaType.APPLICATION_JSON);
 					request.getHeaders().setAccept(List.of(MediaType.TEXT_EVENT_STREAM));
 					request.getBody().write(BODY.formatted("true").getBytes(StandardCharsets.UTF_8));
@@ -112,6 +114,7 @@ class MockUpstreamForwardingIT {
 
 	private HttpEntity<String> jsonEntity(String body) {
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		return new HttpEntity<>(body, headers);
 	}

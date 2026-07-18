@@ -17,10 +17,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.costpilot.api.dto.AuditRecordDto;
 import com.costpilot.domain.AuditRecordRepository;
 import com.costpilot.domain.AuditRecordSpecifications;
+import com.costpilot.security.AuthenticatedPrincipal;
+import com.costpilot.security.CurrentPrincipal;
 
 // 5.1 admin query surface: filter the audit trail by team / project / decision / time.
-// NOTE: unsecured for now - Spring Security + per-team isolation lands in Stage 6.1.
-// Do not expose this publicly until then.
+// 6.1: per-team isolation enforced - a non-admin key is force-scoped to its own team
+// (any teamId filter it passes is overridden); a tenant-admin key may query any team.
 @RestController
 @RequestMapping("/admin/audit")
 public class AdminAuditController {
@@ -44,19 +46,27 @@ public class AdminAuditController {
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size) {
 
+		AuthenticatedPrincipal principal = CurrentPrincipal.require();
+		// isolation: a non-admin caller can only ever see its own team, regardless of the
+		// teamId it asks for
+		String effectiveTeam = principal.admin() ? blankToNull(teamId) : principal.teamId();
+
 		Pageable pageable = PageRequest.of(Math.max(0, page), clampSize(size),
 				Sort.by(Sort.Direction.DESC, "createdAt"));
 		return repository.findAll(
-				AuditRecordSpecifications.filter(blankToNull(teamId), blankToNull(projectId),
+				AuditRecordSpecifications.filter(effectiveTeam, blankToNull(projectId),
 						blankToNull(decision), from, to),
 				pageable)
 				.map(AuditRecordDto::from);
 	}
 
-	// The fully-explained single decision (5.1: "why this decision").
+	// The fully-explained single decision (5.1: "why this decision"). A non-admin caller
+	// may only fetch a row belonging to its own team.
 	@GetMapping("/{id}")
 	public ResponseEntity<AuditRecordDto> byId(@PathVariable java.util.UUID id) {
+		AuthenticatedPrincipal principal = CurrentPrincipal.require();
 		return repository.findById(id)
+				.filter(row -> principal.admin() || principal.teamId().equals(row.getTeamId()))
 				.map(AuditRecordDto::from)
 				.map(ResponseEntity::ok)
 				.orElseGet(() -> ResponseEntity.notFound().build());
