@@ -1,6 +1,5 @@
 package com.costpilot.analytics.ingest;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 
@@ -76,10 +75,12 @@ public class UsageEventConsumer {
 	}
 
 	private void insertBatch(List<UsageEvent> events) {
+		// event_ts written as epoch millis via fromUnixTimestamp64Milli so there is no
+		// driver/session-timezone ambiguity - the query side reads it back the same way.
 		String sql = "insert into " + chProps.getUsageEventsTable() + " "
 				+ "(event_id, tenant_id, team_id, project_id, user_id, environment, provider, "
 				+ "original_model, executed_model, decision, finish_reason, input_tokens, output_tokens, "
-				+ "cost_nanos, event_ts) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+				+ "cost_nanos, event_ts) values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,fromUnixTimestamp64Milli(?))";
 		clickhouse.batchUpdate(sql, events, events.size(), (ps, e) -> {
 			ps.setString(1, e.eventId().toString());
 			ps.setString(2, nullToEmpty(e.tenantId()));
@@ -95,7 +96,7 @@ public class UsageEventConsumer {
 			ps.setInt(12, e.inputTokens());
 			ps.setInt(13, e.outputTokens());
 			ps.setLong(14, e.costNanos());
-			ps.setTimestamp(15, Timestamp.from(e.timestamp() != null ? e.timestamp() : Instant.now()));
+			ps.setLong(15, (e.timestamp() != null ? e.timestamp() : Instant.now()).toEpochMilli());
 		});
 	}
 
