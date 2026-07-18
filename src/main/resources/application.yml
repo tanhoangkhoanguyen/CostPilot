@@ -79,8 +79,20 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        # 6.2: prometheus scrape target + health probes; nothing else exposed
+        include: health,prometheus,info
   endpoint:
     health:
       probes:
         enabled: true
+    prometheus:
+      # Boot 3.4+ gates each endpoint by access level; make the scrape readable
+      access: read_only
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      # every metric carries the app name so a multi-service Prometheus can slice by it
+      application: costpilot
