@@ -111,6 +111,27 @@ docker compose up -d
 
 Point your OpenAI-compatible SDK at `http://localhost:8080/v1` with a CostPilot key as the bearer token. For any real deploy also override `COSTPILOT_API_KEY_PEPPER` and mint fresh keys via `POST /admin/keys`.
 
+## Load-test numbers (k6, reproducible)
+
+One command runs the whole benchmark - stack up, budgets seeded, three k6 scenarios, then the claims are verified straight from the Postgres ledger:
+
+```bash
+bash loadtest/run.sh
+```
+
+Scenarios: 130s warm soak at 30 req/s, then **100 req/s sustained for 30s** across 10 governed teams (guard latency), then **300 requests flooding 10 teams with tiny caps** (overspend), then **10 concurrent long streams** against cutoff-sized caps (cutoff accuracy).
+
+Measured on a dev laptop (Windows 11, Docker Desktop, whole stack + k6 on one machine), latest run:
+
+| claim | target | measured |
+|-------|--------|----------|
+| budget-guard decision p50 / p95 / p99 at 100 req/s | p99 < 5 ms | 2.03 ms / 3.08 ms / **4.65 ms** |
+| teams overspending their cap under flood | 0 | **0 of 30** (156 served, 144 blocked with 402) |
+| worst mid-stream cutoff overshoot | < 1 output token | **0.33 tokens** |
+| functional checks (clean cutoff signal, valid statuses) | 100% | **100%** (7213 of 7213) |
+
+End-to-end request p99 during the guard-latency window was ~500 ms on this shared machine; that number swings with host load and is only sanity-bounded (< 3 s) by the harness - the enforcement targets above are the stable, published claims. Guard quantiles are read back from Prometheus at the measurement window, so micrometer's decaying summary can't dilute them with cold-start samples.
+
 ## Development
 
 - Build + full test suite (Testcontainers - needs Docker): `./gradlew build`
