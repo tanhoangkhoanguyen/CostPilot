@@ -109,8 +109,13 @@ class AnalyticsReconciliationIT {
 		seedMatching(team, 3_000_000L, 100, 50);
 		seedMatching(team, 7_000_000L, 200, 80);
 
-		ReconciliationResult result = restTemplate.getForObject(
-				"/api/analytics/reconcile?from={f}&to={t}", ReconciliationResult.class, t0.toString(), t1.toString());
+		// admin key: reconcile the whole window across all teams (a non-admin would be
+		// team-scoped, which is covered separately)
+		ReconciliationResult result = restTemplate.exchange(
+				"/api/analytics/reconcile?from={f}&to={t}",
+				org.springframework.http.HttpMethod.GET,
+				new org.springframework.http.HttpEntity<>(com.costpilot.security.AuthTestSupport.admin()),
+				ReconciliationResult.class, t0.toString(), t1.toString()).getBody();
 
 		assertThat(result.postgresRows()).isEqualTo(result.clickhouseRows());
 		assertThat(result.postgresNanos()).isEqualTo(result.clickhouseNanos());
@@ -124,9 +129,11 @@ class AnalyticsReconciliationIT {
 		seedMatching(team, 5_000_000L, 10, 5);
 		seedMatching(team, 5_000_000L, 10, 5);
 
-		SpendBucket[] buckets = restTemplate.getForObject(
-				"/api/analytics/spend?groupBy=team&from={f}&to={t}", SpendBucket[].class,
-				t0.toString(), t1.toString());
+		SpendBucket[] buckets = restTemplate.exchange(
+				"/api/analytics/spend?groupBy=team&from={f}&to={t}",
+				org.springframework.http.HttpMethod.GET,
+				new org.springframework.http.HttpEntity<>(com.costpilot.security.AuthTestSupport.admin()),
+				SpendBucket[].class, t0.toString(), t1.toString()).getBody();
 
 		SpendBucket bucket = java.util.Arrays.stream(buckets)
 				.filter(b -> team.equals(b.key())).findFirst().orElseThrow();

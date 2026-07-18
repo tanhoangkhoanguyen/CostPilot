@@ -35,4 +35,13 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecord, UUID> 
 	BigDecimal totalCostBetween(@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
 
 	long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(java.time.Instant from, java.time.Instant to);
+
+	// 6.1: team-scoped reconciliation - a non-admin reconciles only its own team's window.
+	@Query("select coalesce(sum(u.cost), 0) from UsageRecord u "
+			+ "where u.teamId = :team and u.createdAt >= :from and u.createdAt < :to")
+	BigDecimal totalCostForTeamBetween(@Param("team") String team,
+			@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
+
+	long countByTeamIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+			String teamId, java.time.Instant from, java.time.Instant to);
 }

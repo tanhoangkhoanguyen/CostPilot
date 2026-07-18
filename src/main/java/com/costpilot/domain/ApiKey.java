@@ -37,6 +37,11 @@ public class ApiKey {
 	@Column(name = "revoked_at")
 	private Instant revokedAt;
 
+	// 6.1: a tenant-admin key sees all teams; a normal team key is force-scoped to its own
+	// team on the admin/analytics surfaces. Column added in V8.
+	@Column(name = "is_admin", nullable = false)
+	private boolean admin;
+
 	protected ApiKey() {
 	}
 
@@ -45,6 +50,11 @@ public class ApiKey {
 		this.projectId = projectId;
 		this.keyHash = keyHash;
 		this.name = name;
+	}
+
+	public ApiKey(UUID teamId, UUID projectId, String keyHash, String name, boolean admin) {
+		this(teamId, projectId, keyHash, name);
+		this.admin = admin;
 	}
 
 	public UUID getId() {
@@ -77,5 +87,9 @@ public class ApiKey {
 
 	public boolean isRevoked() {
 		return revokedAt != null;
+	}
+
+	public boolean isAdmin() {
+		return admin;
 	}
 }

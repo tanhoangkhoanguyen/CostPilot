@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.costpilot.TestcontainersConfiguration;
+import com.costpilot.security.AuthTestSupport;
 import com.costpilot.domain.AuditRecord;
 import com.costpilot.domain.AuditRecordRepository;
 import com.costpilot.domain.Budget;
@@ -62,6 +63,7 @@ class AuditTrailIT {
 	private ResponseEntity<String> post(String team, String model, int maxTokens) {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.set("X-Team-ID", team);
 		return restTemplate.exchange("/v1/chat/completions", HttpMethod.POST,
 				new HttpEntity<>(BODY.formatted(model, maxTokens), headers), String.class);
@@ -189,6 +191,7 @@ class AuditTrailIT {
 				.contentType(MediaType.APPLICATION_JSON)
 				.accept(MediaType.TEXT_EVENT_STREAM)
 				.header("X-Team-ID", team)
+				.header("Authorization", "Bearer " + AuthTestSupport.ADMIN_KEY)
 				.bodyValue(body)
 				.retrieve()
 				.bodyToFlux(String.class)

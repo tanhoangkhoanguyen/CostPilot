@@ -66,40 +66,54 @@ public class AnalyticsQueryService {
 	}
 
 	// deduped rows for [from,to): one row per event_id, latest ingest wins.
-	// The window bounds are bound as ISO-8601 strings and parsed in ClickHouse - binding
-	// a java.sql.Timestamp renders an unquoted datetime the CH parser rejects.
-	private String dedupSubquery(String extraCols) {
+	// The window bounds are bound as epoch millis via fromUnixTimestamp64Milli - matching
+	// exactly how event_ts was written on ingest (no driver/session-timezone ambiguity).
+	// 6.1: when teamScope != null the subquery also constrains team_id = ? so per-team
+	// isolation is applied INSIDE the aggregation, not as a post-filter - a non-admin can
+	// never aggregate over another team's rows.
+	private String dedupSubquery(String extraCols, boolean teamScoped) {
 		return "select event_id, argMax(cost_nanos, ingested_at) as cost_nanos, "
 				+ "argMax(input_tokens, ingested_at) as input_tokens, "
 				+ "argMax(output_tokens, ingested_at) as output_tokens" + extraCols
 				+ " from " + table()
 				+ " where event_ts >= fromUnixTimestamp64Milli(?) "
-				+ "and event_ts < fromUnixTimestamp64Milli(?) group by event_id";
+				+ "and event_ts < fromUnixTimestamp64Milli(?)"
+				+ (teamScoped ? " and team_id = ?" : "") + " group by event_id";
 	}
 
-	public List<SpendBucket> spendByDimension(String dimension, Instant from, Instant to) {
+	// bind the window bounds, then the optional team filter, in the order the ? appear
+	private static Object[] windowArgs(Instant from, Instant to, String teamScope) {
+		return teamScope == null
+				? new Object[] { ts(from), ts(to) }
+				: new Object[] { ts(from), ts(to), teamScope };
+	}
+
+	public List<SpendBucket> spendByDimension(String dimension, Instant from, Instant to, String teamScope) {
 		String col = Dimension.columnFor(dimension);
 		String sql = "select k as key, sum(cost_nanos) as cost_nanos, count() as requests, "
 				+ "sum(input_tokens) as in_tok, sum(output_tokens) as out_tok from ("
-				+ dedupSubquery(", argMax(" + col + ", ingested_at) as k")
+				+ dedupSubquery(", argMax(" + col + ", ingested_at) as k", teamScope != null)
 				+ ") group by k order by cost_nanos desc";
 		return clickhouse.query(sql, (rs, i) -> new SpendBucket(
 				rs.getString("key"), usd(rs.getLong("cost_nanos")),
 				rs.getLong("requests"), rs.getLong("in_tok"), rs.getLong("out_tok")),
-				ts(from), ts(to));
+				windowArgs(from, to, teamScope));
 	}
 
-	public List<TopSpender> topSpenders(String dimension, int limit, Instant from, Instant to) {
+	public List<TopSpender> topSpenders(String dimension, int limit, Instant from, Instant to, String teamScope) {
 		String col = Dimension.columnFor(dimension);
 		String sql = "select k as key, sum(cost_nanos) as cost_nanos, count() as requests from ("
-				+ dedupSubquery(", argMax(" + col + ", ingested_at) as k")
+				+ dedupSubquery(", argMax(" + col + ", ingested_at) as k", teamScope != null)
 				+ ") group by k order by cost_nanos desc limit ?";
+		Object[] base = windowArgs(from, to, teamScope);
+		Object[] args = java.util.Arrays.copyOf(base, base.length + 1);
+		args[base.length] = limit;
 		return clickhouse.query(sql, (rs, i) -> new TopSpender(
 				rs.getString("key"), usd(rs.getLong("cost_nanos")), rs.getLong("requests")),
-				ts(from), ts(to), limit);
+				args);
 	}
 
-	public DecisionCounts decisionCounts(Instant from, Instant to) {
+	public DecisionCounts decisionCounts(Instant from, Instant to, String teamScope) {
 		// decision comes from the event; a cutoff is an allow/downgrade whose stream was
 		// truncated, identified by finish_reason=budget_cutoff
 		String sql = "select "
@@ -109,39 +123,43 @@ public class AnalyticsQueryService {
 				+ "countIf(decision = 'deny') as deny, "
 				+ "countIf(decision = 'require_approval') as approval from ("
 				+ dedupSubquery(", argMax(decision, ingested_at) as decision, "
-						+ "argMax(finish_reason, ingested_at) as finish_reason")
+						+ "argMax(finish_reason, ingested_at) as finish_reason", teamScope != null)
 				+ ")";
 		return clickhouse.queryForObject(sql, (rs, i) -> new DecisionCounts(
 				rs.getLong("allow"), rs.getLong("downgrade"), rs.getLong("cutoff"),
-				rs.getLong("deny"), rs.getLong("approval")), ts(from), ts(to));
+				rs.getLong("deny"), rs.getLong("approval")), windowArgs(from, to, teamScope));
 	}
 
-	public List<TrendPoint> trends(String interval, Instant from, Instant to) {
+	public List<TrendPoint> trends(String interval, Instant from, Instant to, String teamScope) {
 		String unit = "hour".equalsIgnoreCase(interval) ? "1 hour" : "1 day";
 		String sql = "select toStartOfInterval(ev_ts, interval " + unit + ") as bucket, "
 				+ "sum(cost_nanos) as cost_nanos, count() as requests from ("
-				+ dedupSubquery(", argMax(event_ts, ingested_at) as ev_ts")
+				+ dedupSubquery(", argMax(event_ts, ingested_at) as ev_ts", teamScope != null)
 				+ ") group by bucket order by bucket";
 		return clickhouse.query(sql, (rs, i) -> new TrendPoint(
 				rs.getTimestamp("bucket").toInstant(), usd(rs.getLong("cost_nanos")), rs.getLong("requests")),
-				ts(from), ts(to));
+				windowArgs(from, to, teamScope));
 	}
 
 	// Budget limits from Postgres (money truth), spend from ClickHouse (reporting),
 	// joined in Java by scope ref. scopeType maps to the grouping dimension.
-	public List<BudgetUtilization> budgetUtilization(String scopeType, Instant from, Instant to) {
-		String dimension = switch (scopeType.toLowerCase()) {
+	// 6.1: a non-admin (teamScope != null) may only see its own team's utilization - the
+	// scope is forced to team and the result confined to its own budget row.
+	public List<BudgetUtilization> budgetUtilization(String scopeType, Instant from, Instant to, String teamScope) {
+		String effectiveScope = teamScope != null ? "team" : scopeType;
+		String dimension = switch (effectiveScope.toLowerCase()) {
 			case "team" -> "team";
 			case "project" -> "project";
 			default -> throw new IllegalArgumentException("unsupported budget scope: " + scopeType);
 		};
 		Map<String, Long> spendByRef = new java.util.HashMap<>();
-		for (SpendBucket b : spendByDimension(dimension, from, to)) {
+		for (SpendBucket b : spendByDimension(dimension, from, to, teamScope)) {
 			spendByRef.put(b.key(), new BigDecimal(b.costUsd()).movePointRight(9).longValueExact());
 		}
 		return budgetRepository.findAll().stream()
 				.filter(Budget::isActive)
-				.filter(b -> b.getScopeType().equalsIgnoreCase(scopeType))
+				.filter(b -> b.getScopeType().equalsIgnoreCase(effectiveScope))
+				.filter(b -> teamScope == null || teamScope.equals(b.getScopeRef()))
 				.map(b -> {
 					long limitNanos = BudgetService.toNanos(b.getLimitAmount());
 					long spentNanos = spendByRef.getOrDefault(b.getScopeRef(), 0L);
@@ -153,15 +171,26 @@ public class AnalyticsQueryService {
 
 	// 5.3/5.4 acceptance: ClickHouse totals reconcile with the Postgres ledger for a
 	// fixed window. Compared as exact integer nanodollars - no float drift.
-	public ReconciliationResult reconcile(Instant from, Instant to) {
-		long pgRows = usageRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to);
-		long pgNanos = BudgetService.toNanos(usageRepository.totalCostBetween(from, to));
+	// 6.1: a non-admin reconciles only its own team (both sides team-scoped); an admin
+	// reconciles the whole window.
+	public ReconciliationResult reconcile(Instant from, Instant to, String teamScope) {
+		long pgRows;
+		long pgNanos;
+		if (teamScope == null) {
+			pgRows = usageRepository.countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(from, to);
+			pgNanos = BudgetService.toNanos(usageRepository.totalCostBetween(from, to));
+		} else {
+			pgRows = usageRepository.countByTeamIdAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+					teamScope, from, to);
+			pgNanos = BudgetService.toNanos(usageRepository.totalCostForTeamBetween(teamScope, from, to));
+		}
 
 		String sql = "select count() as n, sum(cost_nanos) as cost_nanos from ("
 				+ "select event_id, argMax(cost_nanos, ingested_at) as cost_nanos from " + table()
 				+ " where event_ts >= fromUnixTimestamp64Milli(?) "
-				+ "and event_ts < fromUnixTimestamp64Milli(?) group by event_id)";
-		Map<String, Object> ch = clickhouse.queryForMap(sql, ts(from), ts(to));
+				+ "and event_ts < fromUnixTimestamp64Milli(?)"
+				+ (teamScope != null ? " and team_id = ?" : "") + " group by event_id)";
+		Map<String, Object> ch = clickhouse.queryForMap(sql, windowArgs(from, to, teamScope));
 		long chRows = ((Number) ch.get("n")).longValue();
 		long chNanos = ch.get("cost_nanos") == null ? 0 : ((Number) ch.get("cost_nanos")).longValue();
 

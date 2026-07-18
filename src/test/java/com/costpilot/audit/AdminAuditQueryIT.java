@@ -12,12 +12,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.domain.AuditRecord;
 import com.costpilot.domain.AuditRecordRepository;
+import com.costpilot.security.AuthTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 
 // 5.1 admin query: filter by team / project / decision / time, paginated, newest first.
@@ -55,7 +58,8 @@ class AdminAuditQueryIT {
 	}
 
 	private JsonNode get(String query) {
-		ResponseEntity<JsonNode> response = restTemplate.getForEntity("/admin/audit" + query, JsonNode.class);
+		ResponseEntity<JsonNode> response = restTemplate.exchange("/admin/audit" + query, HttpMethod.GET,
+				new HttpEntity<>(AuthTestSupport.admin()), JsonNode.class);
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 		return response.getBody();
 	}

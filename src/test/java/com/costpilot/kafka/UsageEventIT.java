@@ -29,6 +29,7 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 import com.costpilot.KafkaTestcontainersConfiguration;
 import com.costpilot.TestcontainersConfiguration;
+import com.costpilot.security.AuthTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -80,6 +81,7 @@ class UsageEventIT {
 	private ResponseEntity<String> post(String team, String model, boolean stream, String idempotencyKey) {
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.set("X-Team-ID", team);
 		if (idempotencyKey != null) {
 			headers.set("Idempotency-Key", idempotencyKey);

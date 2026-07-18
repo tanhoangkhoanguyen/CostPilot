@@ -47,6 +47,7 @@ class StreamingPassthroughIT {
 				.uri("/v1/chat/completions")
 				.contentType(MediaType.APPLICATION_JSON)
 				.accept(MediaType.TEXT_EVENT_STREAM)
+				.header("Authorization", "Bearer " + com.costpilot.security.AuthTestSupport.ADMIN_KEY)
 				.bodyValue(BODY)
 				.retrieve()
 				.bodyToFlux(String.class);

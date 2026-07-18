@@ -32,6 +32,8 @@ import com.costpilot.policy.ApprovalRequiredException;
 import com.costpilot.policy.PolicyDecision;
 import com.costpilot.policy.PolicyDeniedException;
 import com.costpilot.policy.PolicyService;
+import com.costpilot.security.AuthenticatedPrincipal;
+import com.costpilot.security.CurrentPrincipal;
 import com.costpilot.upstream.ForwardingService;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -68,20 +70,33 @@ public class ChatCompletionsController {
 			MediaType.TEXT_EVENT_STREAM_VALUE })
 	public Object chatCompletions(
 			@Valid @RequestBody ChatCompletionRequest request,
-			@RequestHeader(value = "X-Team-ID", required = false) String teamId,
-			@RequestHeader(value = "X-Project-ID", required = false) String projectId,
+			@RequestHeader(value = "X-Team-ID", required = false) String teamHeader,
+			@RequestHeader(value = "X-Project-ID", required = false) String projectHeader,
 			@RequestHeader(value = "X-User-ID", required = false) String userId,
 			@RequestHeader(value = "X-Environment", required = false) String environment,
 			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
 			HttpServletResponse servletResponse) {
 
+		// 6.1: identity now comes from the authenticated API key, not trusted headers.
+		// A tenant-admin key may still impersonate any team via X-Team-ID/X-Project-ID
+		// (ops/testing); a normal team key is force-pinned to its own team and the headers
+		// are ignored. This is what enforces per-team isolation on the data plane.
+		AuthenticatedPrincipal principal = CurrentPrincipal.require();
+		String tenantId = principal.tenantId();
+		String teamId = principal.admin() && teamHeader != null && !teamHeader.isBlank()
+				? teamHeader : principal.teamId();
+		String projectId = principal.admin()
+				? (projectHeader != null && !projectHeader.isBlank() ? projectHeader : principal.projectId())
+				: principal.projectId();
+
 		RequestContext context = RequestContext.of(teamId, projectId);
-		log.info("chat.completions team={} project={} model={} stream={}",
-				context.teamId(), context.projectId(), request.model(), request.isStreaming());
+		log.info("chat.completions tenant={} team={} project={} model={} stream={} admin={}",
+				tenantId, context.teamId(), context.projectId(), request.model(), request.isStreaming(),
+				principal.admin());
 
 		// client-supplied Idempotency-Key makes retries replay-safe in the ledger;
 		// without one, each request is its own ledger entry
-		LedgerContext ledgerContext = new LedgerContext(null, teamId, projectId, userId, environment,
+		LedgerContext ledgerContext = new LedgerContext(tenantId, teamId, projectId, userId, environment,
 				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
 
 		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);

@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.domain.UsageRecord;
 import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.security.AuthTestSupport;
 
 // End-to-end money spine: gateway request -> mock upstream -> usage -> cost -> ledger row.
 // The ledger sum must equal the recomputed per-request costs exactly.
@@ -52,6 +53,7 @@ class GatewayLedgerReconciliationIT {
 
 	private ResponseEntity<String> post(String body, String idempotencyKey) {
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.set("X-Team-ID", "team-a");
 		headers.set("X-Project-ID", "project-x");
@@ -102,6 +104,7 @@ class GatewayLedgerReconciliationIT {
 	void streamingRequestsAlsoLandInTheLedger() throws Exception {
 		String streamBody = BODY.replace("\"stream\": false", "\"stream\": true");
 		HttpHeaders headers = new HttpHeaders();
+		headers.setBearerAuth(AuthTestSupport.ADMIN_KEY);
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.setAccept(List.of(MediaType.TEXT_EVENT_STREAM));
 		headers.set("X-Team-ID", "team-a");
