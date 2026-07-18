@@ -1,0 +1,11 @@
+# 6.2: auto-provision the Prometheus datasource so the governance dashboard works on a
+# fresh `docker compose up` with no manual clicks.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true

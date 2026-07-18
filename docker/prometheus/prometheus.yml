@@ -1,0 +1,13 @@
+# 6.2: Prometheus scrapes the gateway's Micrometer endpoint. The compose `gateway`
+# service (added in 6.4) exposes /actuator/prometheus on :8080.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: costpilot-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['gateway:8080']
+        labels:
+          service: costpilot

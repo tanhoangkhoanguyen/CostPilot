@@ -25,6 +25,7 @@ import com.costpilot.cost.StreamCostMeter;
 import com.costpilot.cost.UsageLedgerService;
 import com.costpilot.domain.AuditRecord;
 import com.costpilot.kafka.UsageEventPublisher;
+import com.costpilot.metrics.GovernanceMetrics;
 import com.costpilot.provider.ProviderAdapter;
 import com.costpilot.provider.ProviderRegistry;
 
@@ -48,12 +49,13 @@ public class ForwardingService {
 	private final CostEstimator estimator;
 	private final WebClient webClient;
 	private final ObjectProvider<WebServerApplicationContext> webServerContext;
+	private final GovernanceMetrics metrics;
 
 	public ForwardingService(UpstreamProperties properties, ProviderRegistry registry,
 			CostService costService, UsageLedgerService usageLedger, AuditService auditService,
 			ObjectProvider<UsageEventPublisher> eventPublisher,
 			CostEstimator estimator, WebClient.Builder webClientBuilder,
-			ObjectProvider<WebServerApplicationContext> webServerContext) {
+			ObjectProvider<WebServerApplicationContext> webServerContext, GovernanceMetrics metrics) {
 		this.properties = properties;
 		this.registry = registry;
 		this.costService = costService;
@@ -63,17 +65,22 @@ public class ForwardingService {
 		this.estimator = estimator;
 		this.webClient = webClientBuilder.build();
 		this.webServerContext = webServerContext;
+		this.metrics = metrics;
 	}
 
 	public Mono<CanonicalChatResponse> forward(CanonicalChatRequest request, DecisionContext decision) {
 		ProviderAdapter adapter = registry.forModel(request.model());
 		Instant requestedAt = Instant.now();
+		long start = System.nanoTime();
 		return exchange(adapter, request)
 				.accept(MediaType.APPLICATION_JSON)
 				.retrieve()
 				.bodyToMono(String.class)
 				.map(adapter::parseResponse)
-				.doOnNext(response -> ledger(adapter, request, decision, response.usage(), requestedAt));
+				.doOnNext(response -> {
+					metrics.recordUpstreamLatency(adapter.providerId(), System.nanoTime() - start);
+					ledger(adapter, request, decision, response.usage(), requestedAt);
+				});
 	}
 
 	private void ledger(ProviderAdapter adapter, CanonicalChatRequest request, DecisionContext decision,
@@ -93,6 +100,8 @@ public class ForwardingService {
 				AuditRecord audit = auditService.recordForwarded(decision, adapter.providerId(), usage,
 						priced.cost().total(), result.record());
 				publishEvent(decision, adapter.providerId(), usage, priced.cost().total(), audit);
+				// count tokens once per billed request (fresh insert = not a replay)
+				metrics.recordTokens(usage.inputTokens(), usage.outputTokens());
 			}
 		} catch (PriceNotFoundException e) {
 			// unpriced model: nothing to ledger yet; the request itself must not fail
@@ -137,6 +146,7 @@ public class ForwardingService {
 			Long cutoffAllowanceNanos) {
 		ProviderAdapter adapter = registry.forModel(request.model());
 		Instant requestedAt = Instant.now();
+		long start = System.nanoTime();
 		// mid-stream metering (4.2): accrue cost token-by-token as chunks arrive,
 		// reconciled against provider-reported usage; unpriced models stream unmetered
 		StreamCostMeter meter = meterOrNull(adapter, request, requestedAt);
@@ -166,6 +176,7 @@ public class ForwardingService {
 					if (crossed && cutOff.compareAndSet(false, true)) {
 						// single writer: the audit row (5.1) reads this once in doFinally
 						decision.finishReason().set("budget_cutoff");
+						metrics.cutoff();
 						log.info("mid-stream cutoff model={} accruedTokens={} accruedCost={} allowance={}",
 								request.model(), meter.usage().totalTokens(),
 								meter.runningCost().total().toPlainString(),
@@ -182,6 +193,7 @@ public class ForwardingService {
 				// fire. Whatever ends the stream - complete, cancel, error - if tokens
 				// were consumed they must be billed.
 				.doFinally(signal -> {
+					metrics.recordUpstreamLatency(adapter.providerId(), System.nanoTime() - start);
 					if (meter != null && meter.usage().totalTokens() > 0) {
 						log.info("stream meter final model={} inputTokens={} outputTokens={} cost={}",
 								request.model(), meter.usage().inputTokens(), meter.usage().outputTokens(),
