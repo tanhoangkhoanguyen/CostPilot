@@ -36,6 +36,12 @@ server:
   port: 8080
 
 costpilot:
+  # 6.1: server-side pepper for API-key hashing (HMAC-SHA256). The dev default lets
+  # tests + the seeded demo keys resolve out of the box; a real deploy MUST override
+  # COSTPILOT_API_KEY_PEPPER with a secret. The seeded V8 key hashes are computed with
+  # this exact dev value - change it and the seeded keys stop resolving.
+  security:
+    api-key-pepper: ${COSTPILOT_API_KEY_PEPPER:costpilot-dev-pepper}
   # 5.2: append-only usage events -> Kafka (off the hot path). Disabled by default.
   kafka:
     enabled: ${COSTPILOT_KAFKA_ENABLED:false}
