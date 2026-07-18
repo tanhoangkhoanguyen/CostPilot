@@ -1,4 +1,41 @@
 services:
+  # 6.4: the gateway itself. Mock upstream is embedded (COSTPILOT_UPSTREAM_MODE=mock,
+  # the default) so the whole demo costs $0. Drop in real keys via env to go live:
+  #   COSTPILOT_UPSTREAM_MODE=real COSTPILOT_UPSTREAM_OPENAI_API_KEY=sk-... docker compose up
+  gateway:
+    build: .
+    container_name: costpilot-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      COSTPILOT_DB_HOST: postgres
+      COSTPILOT_REDIS_HOST: redis
+      COSTPILOT_KAFKA_ENABLED: "true"
+      COSTPILOT_KAFKA_BOOTSTRAP: kafka:29092
+      COSTPILOT_CLICKHOUSE_ENABLED: "true"
+      COSTPILOT_CLICKHOUSE_HOST: clickhouse
+      COSTPILOT_UPSTREAM_MODE: ${COSTPILOT_UPSTREAM_MODE:-mock}
+      # pace the embedded mock at 5ms/token so the mid-stream cutoff demo lands in
+      # seconds instead of brushing the 30s SSE timeout
+      COSTPILOT_MOCK_UPSTREAM_TOKEN_DELAY_MS: "5"
+      COSTPILOT_UPSTREAM_OPENAI_API_KEY: ${COSTPILOT_UPSTREAM_OPENAI_API_KEY:-}
+      COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY: ${COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY:-}
+      COSTPILOT_UPSTREAM_GEMINI_API_KEY: ${COSTPILOT_UPSTREAM_GEMINI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   postgres:
     image: postgres:16-alpine
     container_name: costpilot-postgres
@@ -39,10 +76,13 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # HOST listener keeps localhost:9092 working for apps on the host machine;
+      # INTERNAL (kafka:29092) is what the gateway container uses inside the network
+      KAFKA_LISTENERS: HOST://0.0.0.0:9092,INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,HOST:PLAINTEXT,INTERNAL:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -67,10 +107,41 @@ services:
       - clickhouse-data:/var/lib/clickhouse
       - ./docker/clickhouse/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      # 127.0.0.1, not localhost: the image's IPv6 bind fails silently and localhost
+      # resolves to ::1 inside the container -> healthcheck refused while 8123 is fine
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
       interval: 5s
       timeout: 3s
       retries: 20
+
+  # 6.2/6.4: metrics + dashboard. Prometheus scrapes the gateway; Grafana auto-loads
+  # the governance dashboard from docker/grafana - zero manual clicks after up.
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: costpilot-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: costpilot-grafana
+    ports:
+      # override the host port when 3000 is taken: COSTPILOT_GRAFANA_PORT=3300 docker compose up
+      - "${COSTPILOT_GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
 
 volumes:
   postgres-data:
