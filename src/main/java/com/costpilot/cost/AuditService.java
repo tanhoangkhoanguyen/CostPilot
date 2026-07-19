@@ -80,6 +80,7 @@ public class AuditService {
 			case DOWNGRADE -> "downgrade";
 			case DENY -> "deny";
 			case REQUIRE_APPROVAL -> "require_approval";
+			case ROUTE -> "route";
 		};
 	}
 }

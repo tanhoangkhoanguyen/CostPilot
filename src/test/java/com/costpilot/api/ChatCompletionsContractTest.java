@@ -92,6 +92,12 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private com.costpilot.metrics.GovernanceMetrics metrics;
 
+	// 7.2: the controller now depends on the cost router. These contract tests never send
+	// X-CostPilot-Min-Tier, so route() is never called - the bean just has to exist for the
+	// web slice to load.
+	@MockitoBean
+	private com.costpilot.routing.RoutingService routingService;
+
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
 		when(budgetGuard.reserve(any(), any()))

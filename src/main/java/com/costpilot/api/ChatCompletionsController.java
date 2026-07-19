@@ -56,10 +56,12 @@ public class ChatCompletionsController {
 	private final BudgetService budgetService;
 	private final AuditService auditService;
 	private final GovernanceMetrics metrics;
+	private final com.costpilot.routing.RoutingService routingService;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
 			PolicyService policyService, DowngradeService downgradeService, BudgetService budgetService,
-			AuditService auditService, GovernanceMetrics metrics) {
+			AuditService auditService, GovernanceMetrics metrics,
+			com.costpilot.routing.RoutingService routingService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
@@ -67,6 +69,7 @@ public class ChatCompletionsController {
 		this.budgetService = budgetService;
 		this.auditService = auditService;
 		this.metrics = metrics;
+		this.routingService = routingService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -78,6 +81,7 @@ public class ChatCompletionsController {
 			@RequestHeader(value = "X-User-ID", required = false) String userId,
 			@RequestHeader(value = "X-Environment", required = false) String environment,
 			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+			@RequestHeader(value = "X-CostPilot-Min-Tier", required = false) Integer minTier,
 			HttpServletResponse servletResponse) {
 
 		// 6.1: identity now comes from the authenticated API key, not trusted headers.
@@ -136,6 +140,27 @@ public class ChatCompletionsController {
 			}
 			case ALLOW -> {
 			}
+			case ROUTE -> {
+				// policy evaluation never emits ROUTE - it comes from the router below
+			}
+		}
+
+		// 7.2: the request declared a quality bar - route to the cheapest policy-allowed
+		// model that meets it. Only on a plain ALLOW: an explicit policy downgrade wins
+		// over cost routing. No qualifying candidate -> the requested model stands.
+		if (minTier != null && policy.decision() == PolicyDecision.Decision.ALLOW) {
+			var routed = routingService.route(canonical, ledgerContext, minTier, Instant.now());
+			if (routed.isPresent() && !routed.get().model().equals(canonical.model())) {
+				var route = routed.get();
+				metrics.routed();
+				log.info("cost-routed minTier={} original={} executed={} reason=\"{}\"",
+						minTier, canonical.model(), route.model(), route.reason());
+				servletResponse.setHeader("X-CostPilot-Model-Routed",
+						canonical.model() + " -> " + route.model() + "; " + route.reason());
+				canonical = new CanonicalChatRequest(route.model(), canonical.messages(),
+						canonical.maxTokens(), canonical.stream());
+				decision = DecisionContext.routed(ledgerContext, requestedModel, route.model(), route.reason());
+			}
 		}
 
 		// hot-path budget check: hard-block triggers pre-flight auto-downgrade to a
@@ -148,7 +173,7 @@ public class ChatCompletionsController {
 		} catch (BudgetExceededException blocked) {
 			DowngradeOutcome outcome;
 			try {
-				outcome = downgradeForBudget(canonical, ledgerContext, blocked);
+				outcome = downgradeForBudget(canonical, ledgerContext, blocked, minTier);
 			} catch (BudgetExceededException nothingFits) {
 				// no cheaper model fits: the 402 escapes, but 5.1 still needs a row
 				// explaining that budget blocked this request
@@ -202,12 +227,13 @@ public class ChatCompletionsController {
 	/**
 	 * 4.1: the requested model does not fit the remaining budget - retry the
 	 * atomic reservation on cheaper policy-allowed models, cheapest first. If
-	 * nothing fits, the original 402 propagates.
+	 * nothing fits, the original 402 propagates. A declared tier bar (7.2) also
+	 * bounds this path: budget pressure never downgrades below the bar.
 	 */
 	private DowngradeOutcome downgradeForBudget(CanonicalChatRequest canonical, LedgerContext ledgerContext,
-			BudgetExceededException blocked) {
+			BudgetExceededException blocked, Integer minTier) {
 		for (DowngradeService.Candidate candidate : downgradeService
-				.cheaperAllowedAlternatives(canonical, ledgerContext).stream().limit(3).toList()) {
+				.cheaperAllowedAlternatives(canonical, ledgerContext, minTier).stream().limit(3).toList()) {
 			CanonicalChatRequest alternative = new CanonicalChatRequest(candidate.model(),
 					canonical.messages(), canonical.maxTokens(), canonical.stream());
 			try {
