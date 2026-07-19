@@ -149,7 +149,9 @@ class AuditTrailIT {
 		String team = "audit-appr-" + UUID.randomUUID();
 		policyService.upsertRule("team", team, "gpt-4o-mini", "require_approval", null);
 
-		assertThat(post(team, "gpt-4o", 16).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+		// Stage 8: the request is parked (202), not rejected - but it still produces a
+		// require_approval audit row (nothing executed, so executedModel is null).
+		assertThat(post(team, "gpt-4o", 16).getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 
 		AuditRecord row = awaitRow(team);
 		assertThat(row.getDecision()).isEqualTo("require_approval");
