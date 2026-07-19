@@ -52,11 +52,13 @@ public class ChatCompletionsController {
 	private final GovernanceMetrics metrics;
 	private final GovernedRequestExecutor executor;
 	private final com.costpilot.approval.PendingApprovalService approvalService;
+	private final com.costpilot.cache.SemanticCacheService cache;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
 			PolicyService policyService, BudgetService budgetService,
 			AuditService auditService, GovernanceMetrics metrics,
-			GovernedRequestExecutor executor, com.costpilot.approval.PendingApprovalService approvalService) {
+			GovernedRequestExecutor executor, com.costpilot.approval.PendingApprovalService approvalService,
+			com.costpilot.cache.SemanticCacheService cache) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
@@ -65,6 +67,7 @@ public class ChatCompletionsController {
 		this.metrics = metrics;
 		this.executor = executor;
 		this.approvalService = approvalService;
+		this.cache = cache;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -151,13 +154,25 @@ public class ChatCompletionsController {
 		// route (7.2) + budget reserve/downgrade (4.1) live in the shared executor so the
 		// approval-resume path runs identical governance.
 		if (canonical.stream()) {
+			// streaming bypasses the semantic cache (a cached answer is a complete response)
 			GovernedRequestExecutor.Prepared prepared = executor.prepare(canonical, decision, requestedModel,
 					minTier, servletResponse::setHeader);
 			return relayStream(prepared.request(), prepared.decision(), prepared.guard(),
 					cutoffAllowance(prepared.guard()));
 		}
-		return executor.executeNonStreaming(canonical, decision, requestedModel, minTier,
+
+		// 10.2: semantic cache. A close-enough prior prompt is served at $0 provider cost,
+		// before any budget/route/forward. No-op unless the cache is enabled.
+		var cached = cache.lookup(canonical, ledgerContext);
+		if (cached.isPresent()) {
+			servletResponse.setHeader("X-CostPilot-Cache", "hit");
+			return cached.get();
+		}
+		var response = executor.executeNonStreaming(canonical, decision, requestedModel, minTier,
 				servletResponse::setHeader);
+		// store on miss so a future similar prompt hits (best-effort)
+		cache.store(canonical, ledgerContext, response);
+		return response;
 	}
 
 	// 8.1: park a REQUIRE_APPROVAL request (model-set or cost-threshold triggered) instead

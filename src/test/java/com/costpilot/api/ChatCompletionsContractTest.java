@@ -97,10 +97,15 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private com.costpilot.approval.PendingApprovalService approvalService;
 
+	@MockitoBean
+	private com.costpilot.cache.SemanticCacheService cache;
+
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
 		when(policyService.evaluate(any(), any()))
 				.thenAnswer(inv -> PolicyDecision.allowDefault(inv.getArgument(1)));
+		// cache disabled by default in the contract slice: every lookup is a miss
+		when(cache.lookup(any(), any())).thenReturn(java.util.Optional.empty());
 		// streaming path: prepare() returns a no-op reservation so relayStream runs
 		when(executor.prepare(any(), any(), any(), any(), any()))
 				.thenAnswer(inv -> new GovernedRequestExecutor.Prepared(inv.getArgument(0), inv.getArgument(1),

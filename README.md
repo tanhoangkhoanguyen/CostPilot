@@ -98,6 +98,20 @@ curl -s "http://localhost:8080/api/analytics/spend" -H "Authorization: Bearer cp
 curl -s "http://localhost:8080/api/analytics/reconcile" -H "Authorization: Bearer cp_admin_root"
 ```
 
+## Semantic cache (optional cost optimization)
+
+An opt-in spend-reduction layer: when an incoming prompt is semantically close to one already answered, CostPilot serves the cached response at **\$0 provider cost** and records the would-be cost as savings. Off by default; enable with:
+
+```bash
+COSTPILOT_CACHE_ENABLED=true docker compose up -d
+```
+
+- **How it decides:** prompts are embedded by a deterministic local embedder (\$0, no network - dev and tests cost nothing) and stored in **pgvector**, keyed by tenant/team. A lookup takes the nearest neighbor **within the same tenant and team** - tenants can never hit each other's cache. The `Embedder` interface is the single swap point for a real embedding provider.
+- **Precision over recall:** a hit requires cosine similarity ≥ **0.97** (`COSTPILOT_CACHE_SIMILARITY_THRESHOLD`). The threshold is deliberately conservative so the false-hit rate stays low - the cache would rather forward a borderline prompt than serve a wrong answer. A hit sets `X-CostPilot-Cache: hit`.
+- **Savings:** every hit accrues `costpilot.cache.savings_nanos`; the Grafana dashboard shows cache savings, hit ratio, and hit/miss rate, and the figure reconciles against the hit log.
+
+Streaming requests bypass the cache (a cached answer is a complete response).
+
 ## Going live with real providers
 
 Switching upstreams is env-only, never a code change:

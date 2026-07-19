@@ -84,6 +84,27 @@ public class GovernanceMetrics {
 		}
 	}
 
+	/** 10.2: a request was served from the semantic cache - no provider call. */
+	public void cacheHit() {
+		registry.counter("costpilot.cache.hits").increment();
+	}
+
+	/** 10.2: the cache had nothing close enough; the request forwarded normally. */
+	public void cacheMiss() {
+		registry.counter("costpilot.cache.misses").increment();
+	}
+
+	/**
+	 * 10.3: dollars saved by cache hits (the would-be provider cost of the served
+	 * response), accumulated as integer nanodollars. Reconciles against the hit log over
+	 * a fixed window.
+	 */
+	public void recordCacheSavings(long savingsNanos) {
+		if (savingsNanos > 0) {
+			registry.counter("costpilot.cache.savings_nanos").increment(savingsNanos);
+		}
+	}
+
 	public void recordTokens(long inputTokens, long outputTokens) {
 		registry.counter("costpilot.tokens", "direction", "input").increment(inputTokens);
 		registry.counter("costpilot.tokens", "direction", "output").increment(outputTokens);
