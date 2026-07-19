@@ -14,6 +14,7 @@ import com.costpilot.cost.LedgerContext;
 import com.costpilot.domain.ModelPrice;
 import com.costpilot.domain.ModelPriceRepository;
 import com.costpilot.policy.PolicyService;
+import com.costpilot.routing.RoutingService;
 
 /**
  * Price-aware model selection for 4.1: when the estimated cost of the requested
@@ -32,10 +33,10 @@ public class DowngradeService {
 	private final ModelPriceRepository prices;
 	private final CostEstimator estimator;
 	private final PolicyService policyService;
-	private final com.costpilot.routing.RoutingService routingService;
+	private final RoutingService routingService;
 
 	public DowngradeService(ModelPriceRepository prices, CostEstimator estimator, PolicyService policyService,
-			com.costpilot.routing.RoutingService routingService) {
+			RoutingService routingService) {
 		this.prices = prices;
 		this.estimator = estimator;
 		this.policyService = policyService;

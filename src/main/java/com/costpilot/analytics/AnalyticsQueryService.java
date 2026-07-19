@@ -120,13 +120,14 @@ public class AnalyticsQueryService {
 				+ "countIf(finish_reason = 'budget_cutoff') as cutoff, "
 				+ "countIf(decision = 'allow' and finish_reason != 'budget_cutoff') as allow, "
 				+ "countIf(decision = 'downgrade' and finish_reason != 'budget_cutoff') as downgrade, "
+				+ "countIf(decision = 'route' and finish_reason != 'budget_cutoff') as route, "
 				+ "countIf(decision = 'deny') as deny, "
 				+ "countIf(decision = 'require_approval') as approval from ("
 				+ dedupSubquery(", argMax(decision, ingested_at) as decision, "
 						+ "argMax(finish_reason, ingested_at) as finish_reason", teamScope != null)
 				+ ")";
 		return clickhouse.queryForObject(sql, (rs, i) -> new DecisionCounts(
-				rs.getLong("allow"), rs.getLong("downgrade"), rs.getLong("cutoff"),
+				rs.getLong("allow"), rs.getLong("downgrade"), rs.getLong("route"), rs.getLong("cutoff"),
 				rs.getLong("deny"), rs.getLong("approval")), windowArgs(from, to, teamScope));
 	}
 

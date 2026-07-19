@@ -37,7 +37,11 @@ public class SecurityConfig {
 						// ("Connection prematurely closed DURING response").
 						.shouldFilterAllDispatcherTypes(false)
 						.requestMatchers("/actuator/health", "/actuator/health/**",
-								"/actuator/prometheus", "/mock/**")
+								"/actuator/prometheus", "/mock/**",
+								// 5.4 dashboard: the static SPA shell loads without a key; every
+								// /api/analytics call it makes still carries the admin bearer key
+								// and is authenticated below.
+								"/", "/index.html", "/dashboard/**")
 						.permitAll()
 						// admin-only control plane: key minting (6.1) + governance config and
 						// approvals (9.x) require a tenant-admin key. /admin/audit stays out of
