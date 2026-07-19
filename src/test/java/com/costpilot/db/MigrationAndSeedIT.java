@@ -27,9 +27,8 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		// bump this when adding a migration; V11 added pending_approval + the policy
-		// approval-cost threshold (8.1)
-		assertThat(applied).isEqualTo(11);
+		// bump this when adding a migration; V12 added admin_audit (9.1)
+		assertThat(applied).isEqualTo(12);
 		assertThat(failed).isZero();
 	}
 

@@ -88,6 +88,51 @@ public class BudgetService {
 				scope.dbValue(), ref, amount.toPlainString(), fromNanos(remaining).toPlainString());
 	}
 
+	/**
+	 * 9.1 admin CRUD: create or change a budget limit and make it enforce immediately.
+	 * The Postgres row is the source of truth; the Redis counter is a mirror, so it is
+	 * evicted (both the remaining counter and the "no budget" negative cache) and then
+	 * rebuilt from limit - ledger spend. Eviction is required because {@link #rebuild}
+	 * installs the counter with SETNX - a stale counter would otherwise survive the
+	 * limit change. Returns the fresh remaining.
+	 */
+	public BigDecimal upsertLimit(BudgetScope scope, String ref, BigDecimal limitAmount) {
+		Budget budget = budgets.findByScopeTypeAndScopeRef(scope.dbValue(), ref)
+				.map(existing -> {
+					existing.setLimitAmount(limitAmount);
+					existing.setActive(true);
+					return existing;
+				})
+				.orElseGet(() -> new Budget(scope.dbValue(), ref, limitAmount));
+		budgets.save(budget);
+		evictCounter(scope, ref);
+		BigDecimal remaining = rebuild(scope, ref);
+		log.info("budget upserted scope={} ref={} limit={} remaining={}",
+				scope.dbValue(), ref, limitAmount.toPlainString(), remaining.toPlainString());
+		return remaining;
+	}
+
+	/**
+	 * 9.1 admin CRUD: deactivate a budget so it no longer governs. The counter and limit
+	 * mirror are removed; the scope reverts to ungoverned (charges become no-ops).
+	 */
+	public void deactivate(BudgetScope scope, String ref) {
+		budgets.findByScopeTypeAndScopeRefAndActiveTrue(scope.dbValue(), ref).ifPresent(budget -> {
+			budget.setActive(false);
+			budgets.save(budget);
+		});
+		redis.delete(counterKey(scope, ref));
+		redis.delete(limitKey(scope, ref));
+		redis.delete(noneKey(scope, ref));
+		log.info("budget deactivated scope={} ref={}", scope.dbValue(), ref);
+	}
+
+	// drop the mirrored counter + negative cache so rebuild's SETNX installs a fresh value
+	private void evictCounter(BudgetScope scope, String ref) {
+		redis.delete(counterKey(scope, ref));
+		redis.delete(noneKey(scope, ref));
+	}
+
 	/** Live remaining for a scope; rebuilds from the ledger if the counter is gone. */
 	public BigDecimal remaining(BudgetScope scope, String ref) {
 		String value = redis.opsForValue().get(counterKey(scope, ref));

@@ -168,6 +168,17 @@ public class PolicyService {
 		return rule;
 	}
 
+	/** 9.1 admin CRUD: deactivate a rule so the scope reverts to default-open; invalidated. */
+	@Transactional
+	public void deactivateRule(String scopeType, String scopeRef) {
+		rules.findByScopeTypeAndScopeRefAndActiveTrue(scopeType, scopeRef).ifPresent(rule -> {
+			rule.deactivate();
+			rules.flush();
+		});
+		evict(scopeType, scopeRef);
+		log.info("policy rule deactivated scope={}:{}", scopeType, scopeRef);
+	}
+
 	public void evict(String scopeType, String scopeRef) {
 		try {
 			redis.delete(cacheKey(scopeType, scopeRef));

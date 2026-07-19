@@ -78,6 +78,12 @@ public class PolicyRule {
 		this.updatedAt = Instant.now();
 	}
 
+	// 9.1: deactivate a rule so its scope reverts to default-open.
+	public void deactivate() {
+		this.active = false;
+		this.updatedAt = Instant.now();
+	}
+
 	public UUID getId() {
 		return id;
 	}

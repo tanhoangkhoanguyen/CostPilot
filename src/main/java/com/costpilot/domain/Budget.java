@@ -46,6 +46,16 @@ public class Budget {
 		this.limitAmount = limitAmount;
 	}
 
+	// 9.1: admin CRUD mutators. Changing the limit or (de)activating a budget takes
+	// effect at runtime once the caller refreshes the Redis counter (BudgetService).
+	public void setLimitAmount(BigDecimal limitAmount) {
+		this.limitAmount = limitAmount;
+	}
+
+	public void setActive(boolean active) {
+		this.active = active;
+	}
+
 	public UUID getId() {
 		return id;
 	}
