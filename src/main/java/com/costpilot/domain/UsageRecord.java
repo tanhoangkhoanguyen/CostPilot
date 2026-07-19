@@ -57,6 +57,12 @@ public class UsageRecord {
 	@Column(name = "idempotency_key", nullable = false, unique = true, columnDefinition = "text")
 	private String idempotencyKey;
 
+	// 7.3: exact integer nanodollars saved by routing/downgrading this request vs its
+	// requested model. Null when no routing happened or the requested model was unpriced
+	// (savings unknown) - distinct from a measured zero.
+	@Column(name = "savings_nanos")
+	private Long savingsNanos;
+
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt = Instant.now();
 
@@ -130,6 +136,14 @@ public class UsageRecord {
 
 	public String getIdempotencyKey() {
 		return idempotencyKey;
+	}
+
+	public Long getSavingsNanos() {
+		return savingsNanos;
+	}
+
+	public void setSavingsNanos(Long savingsNanos) {
+		this.savingsNanos = savingsNanos;
 	}
 
 	public Instant getCreatedAt() {

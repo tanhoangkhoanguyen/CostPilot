@@ -29,6 +29,15 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecord, UUID> 
 	@Query("select coalesce(sum(u.cost), 0) from UsageRecord u where u.model = :ref")
 	BigDecimal totalCostForModel(@Param("ref") String ref);
 
+	// 7.3: total routing savings recorded in the ledger, for reconciliation against the
+	// accumulated savings metric over a fixed window. Nulls (savings unknown) are ignored.
+	@Query("select coalesce(sum(u.savingsNanos), 0) from UsageRecord u")
+	long totalSavingsNanos();
+
+	@Query("select coalesce(sum(u.savingsNanos), 0) from UsageRecord u "
+			+ "where u.createdAt >= :from and u.createdAt < :to")
+	long totalSavingsNanosBetween(@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
+
 	// 5.4 reconciliation: ledger cost sum over a half-open window [from, to). Compared
 	// against the ClickHouse total for the same window to prove the OLAP pipeline is exact.
 	@Query("select coalesce(sum(u.cost), 0) from UsageRecord u where u.createdAt >= :from and u.createdAt < :to")
