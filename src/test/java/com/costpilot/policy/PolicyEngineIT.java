@@ -116,13 +116,42 @@ class PolicyEngineIT {
 	}
 
 	@Test
-	void requireApprovalIsRejectedWithStableTypeUntilStage8() {
+	void requireApprovalParksTheRequestWithAPendingHandle() {
 		String team = "policy-team-" + UUID.randomUUID();
 		policyService.upsertRule("team", team, "gpt-4o-mini", "require_approval", null);
 
+		// Stage 8: a REQUIRE_APPROVAL request is parked (202 + pending id), not rejected.
 		ResponseEntity<String> response = post(team, null, "gpt-4o");
-		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-		assertThat(response.getBody()).contains("\"type\":\"approval_required\"");
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+		assertThat(response.getBody())
+				.contains("\"object\":\"approval.pending\"")
+				.contains("\"state\":\"pending\"")
+				.contains("\"id\":");
+	}
+
+	@Test
+	void costThresholdOverAllowedModelParksForApproval() {
+		String team = "policy-team-" + UUID.randomUUID();
+		// gpt-4o-mini IS allowed, but a 1-nanodollar approval threshold means any real
+		// request's pre-flight estimate exceeds it -> parked for approval (8.1).
+		policyService.upsertRule("team", team, "gpt-4o-mini", "deny", null, 1L);
+
+		ResponseEntity<String> response = post(team, null, "gpt-4o-mini");
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+		assertThat(response.getBody())
+				.contains("\"object\":\"approval.pending\"")
+				.contains("over approval threshold");
+		// parked, not forwarded
+		assertThat(usageRepository.findAll().stream().noneMatch(r -> team.equals(r.getTeamId()))).isTrue();
+	}
+
+	@Test
+	void underThresholdAllowedModelPassesThrough() {
+		String team = "policy-team-" + UUID.randomUUID();
+		// a very high threshold -> a normal small request stays under it and is served
+		policyService.upsertRule("team", team, "gpt-4o-mini", "deny", null, 1_000_000_000_000L);
+
+		assertThat(post(team, null, "gpt-4o-mini").getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 
 	@Test

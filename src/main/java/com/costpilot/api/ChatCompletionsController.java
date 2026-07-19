@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -16,19 +17,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.costpilot.api.dto.ChatCompletionChunk;
 import com.costpilot.api.dto.ChatCompletionRequest;
-import com.costpilot.api.dto.ChatCompletionResponse;
-import com.costpilot.api.dto.ChatMessage;
-import com.costpilot.budget.BudgetExceededException;
 import com.costpilot.budget.BudgetGuard;
 import com.costpilot.budget.BudgetService;
-import com.costpilot.budget.DowngradeService;
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.cost.AuditService;
 import com.costpilot.cost.DecisionContext;
 import com.costpilot.cost.LedgerContext;
-import com.costpilot.policy.ApprovalRequiredException;
 import com.costpilot.policy.PolicyDecision;
 import com.costpilot.policy.PolicyDeniedException;
 import com.costpilot.metrics.GovernanceMetrics;
@@ -52,24 +47,24 @@ public class ChatCompletionsController {
 	private final ForwardingService forwardingService;
 	private final BudgetGuard budgetGuard;
 	private final PolicyService policyService;
-	private final DowngradeService downgradeService;
 	private final BudgetService budgetService;
 	private final AuditService auditService;
 	private final GovernanceMetrics metrics;
-	private final com.costpilot.routing.RoutingService routingService;
+	private final GovernedRequestExecutor executor;
+	private final com.costpilot.approval.PendingApprovalService approvalService;
 
 	public ChatCompletionsController(ForwardingService forwardingService, BudgetGuard budgetGuard,
-			PolicyService policyService, DowngradeService downgradeService, BudgetService budgetService,
+			PolicyService policyService, BudgetService budgetService,
 			AuditService auditService, GovernanceMetrics metrics,
-			com.costpilot.routing.RoutingService routingService) {
+			GovernedRequestExecutor executor, com.costpilot.approval.PendingApprovalService approvalService) {
 		this.forwardingService = forwardingService;
 		this.budgetGuard = budgetGuard;
 		this.policyService = policyService;
-		this.downgradeService = downgradeService;
 		this.budgetService = budgetService;
 		this.auditService = auditService;
 		this.metrics = metrics;
-		this.routingService = routingService;
+		this.executor = executor;
+		this.approvalService = approvalService;
 	}
 
 	@PostMapping(value = "/v1/chat/completions", produces = { MediaType.APPLICATION_JSON_VALUE,
@@ -113,8 +108,8 @@ public class ChatCompletionsController {
 		// the "why" accumulated across policy + budget; folded into DecisionContext below
 		DecisionContext decision = DecisionContext.allow(ledgerContext, requestedModel);
 
-		// policy first (3.3): who may use what. DENY/REQUIRE_APPROVAL throw 403;
-		// DOWNGRADE swaps the executed model before budget + forwarding
+		// policy first (3.3): who may use what. DENY throws 403; REQUIRE_APPROVAL parks
+		// (Stage 8); DOWNGRADE swaps the executed model before budget + forwarding.
 		PolicyDecision policy = policyService.evaluate(ledgerContext, canonical.model());
 		switch (policy.decision()) {
 			case DENY -> {
@@ -125,9 +120,7 @@ public class ChatCompletionsController {
 				throw new PolicyDeniedException(policy, canonical.model());
 			}
 			case REQUIRE_APPROVAL -> {
-				auditService.recordRejected(rejectedContext(ledgerContext, requestedModel, policy));
-				metrics.policyRejection("require_approval");
-				throw new ApprovalRequiredException(policy, canonical.model());
+				return park(canonical, ledgerContext, requestedModel, minTier, policy, policy.reason());
 			}
 			case DOWNGRADE -> {
 				metrics.downgrade("policy");
@@ -139,125 +132,59 @@ public class ChatCompletionsController {
 						"policy", policy.matchedRuleId(), null);
 			}
 			case ALLOW -> {
+				// 8.1 cost-threshold gate: an otherwise-allowed request whose pre-flight
+				// MAX estimate exceeds the rule's threshold still needs human approval.
+				if (policy.approvalThresholdNanos() != null) {
+					Long estimate = approvalService.estimateMaxNanos(canonical);
+					if (estimate != null && estimate > policy.approvalThresholdNanos()) {
+						String reason = "estimated cost " + estimate + " over approval threshold "
+								+ policy.approvalThresholdNanos();
+						return park(canonical, ledgerContext, requestedModel, minTier, policy, reason);
+					}
+				}
 			}
 			case ROUTE -> {
-				// policy evaluation never emits ROUTE - it comes from the router below
+				// policy evaluation never emits ROUTE - it comes from the router
 			}
 		}
 
-		// 7.2: the request declared a quality bar - route to the cheapest policy-allowed
-		// model that meets it. Only on a plain ALLOW: an explicit policy downgrade wins
-		// over cost routing. No qualifying candidate -> the requested model stands.
-		if (minTier != null && policy.decision() == PolicyDecision.Decision.ALLOW) {
-			var routed = routingService.route(canonical, ledgerContext, minTier, Instant.now());
-			if (routed.isPresent() && !routed.get().model().equals(canonical.model())) {
-				var route = routed.get();
-				metrics.routed();
-				log.info("cost-routed minTier={} original={} executed={} reason=\"{}\"",
-						minTier, canonical.model(), route.model(), route.reason());
-				servletResponse.setHeader("X-CostPilot-Model-Routed",
-						canonical.model() + " -> " + route.model() + "; " + route.reason());
-				canonical = new CanonicalChatRequest(route.model(), canonical.messages(),
-						canonical.maxTokens(), canonical.stream());
-				decision = DecisionContext.routed(ledgerContext, requestedModel, route.model(), route.reason());
-			}
-		}
-
-		// hot-path budget check: hard-block triggers pre-flight auto-downgrade to a
-		// cheaper policy-allowed model (4.1); only when nothing fits does the 402
-		// escape. soft limit serves the request with a warning header (3.2)
-		BudgetGuard.GuardResult guard;
-		long guardStart = System.nanoTime();
-		try {
-			guard = budgetGuard.reserve(canonical, ledgerContext);
-		} catch (BudgetExceededException blocked) {
-			DowngradeOutcome outcome;
-			try {
-				outcome = downgradeForBudget(canonical, ledgerContext, blocked, minTier);
-			} catch (BudgetExceededException nothingFits) {
-				// no cheaper model fits: the 402 escapes, but 5.1 still needs a row
-				// explaining that budget blocked this request
-				auditService.recordRejected(DecisionContext.budgetBlocked(ledgerContext, requestedModel,
-						nothingFits.getScope().dbValue()));
-				metrics.budgetRejection();
-				throw nothingFits;
-			}
-			metrics.downgrade("budget");
-			// audit trail (persisted in 5.1): original vs executed + why
-			log.info("auto-downgrade reason=budget original={} executed={} blockedScope={}",
-					canonical.model(), outcome.request().model(), blocked.getScope().dbValue());
-			servletResponse.setHeader("X-CostPilot-Model-Downgraded",
-					canonical.model() + " -> " + outcome.request().model() + "; reason=budget");
-			canonical = outcome.request();
-			guard = outcome.guard();
-			// original stays the client's requested model even if policy already downgraded once
-			decision = DecisionContext.downgrade(ledgerContext, requestedModel, outcome.request().model(),
-					"budget", null, blocked.getScope().dbValue());
-		}
-		// the hot-path guard decision latency (acceptance: ~<5ms); measured across the
-		// reserve + any pre-flight downgrade retries that produced the final reservation
-		metrics.recordGuardLatency(System.nanoTime() - guardStart);
-		if (guard.warning() != null) {
-			metrics.softLimitWarning();
-			servletResponse.setHeader("X-CostPilot-Budget-Warning", guard.warning());
-		}
-
+		// route (7.2) + budget reserve/downgrade (4.1) live in the shared executor so the
+		// approval-resume path runs identical governance.
 		if (canonical.stream()) {
-			return relayStream(canonical, decision, guard, cutoffAllowance(guard));
+			GovernedRequestExecutor.Prepared prepared = executor.prepare(canonical, decision, requestedModel,
+					minTier, servletResponse::setHeader);
+			return relayStream(prepared.request(), prepared.decision(), prepared.guard(),
+					cutoffAllowance(prepared.guard()));
 		}
-		try {
-			CanonicalChatResponse upstream = forwardingService.forward(canonical, decision).block();
-			return render(canonical, upstream);
-		} finally {
-			budgetGuard.release(guard);
-		}
+		return executor.executeNonStreaming(canonical, decision, requestedModel, minTier,
+				servletResponse::setHeader);
 	}
 
-	private record DowngradeOutcome(CanonicalChatRequest request, BudgetGuard.GuardResult guard) {
+	// 8.1: park a REQUIRE_APPROVAL request (model-set or cost-threshold triggered) instead
+	// of rejecting it. Audit the decision, persist the full request context, and hand the
+	// caller a 202 with a pending id it can poll. The request is NOT forwarded.
+	private ResponseEntity<Map<String, Object>> park(CanonicalChatRequest canonical, LedgerContext ledgerContext,
+			String requestedModel, Integer minTier, PolicyDecision policy, String reason) {
+		auditService.recordRejected(DecisionContext.rejected(ledgerContext, requestedModel,
+				PolicyDecision.Decision.REQUIRE_APPROVAL, reason, policy.matchedRuleId()));
+		metrics.policyRejection("require_approval");
+		var pending = approvalService.park(canonical, ledgerContext, requestedModel, minTier, reason,
+				policy.matchedRuleId());
+		log.info("parked for approval id={} model={} reason=\"{}\"", pending.getId(), requestedModel, reason);
+		return ResponseEntity.accepted().body(Map.of(
+				"id", pending.getId().toString(),
+				"object", "approval.pending",
+				"state", pending.getState().name(),
+				"model", requestedModel,
+				"reason", reason,
+				"expires_at", pending.getExpiresAt().toString()));
 	}
 
-	// DENY / REQUIRE_APPROVAL never forward - build the decision context for the audit
-	// row straight from the policy verdict.
+	// DENY never forwards - build the decision context for the audit row from the verdict.
 	private static DecisionContext rejectedContext(LedgerContext ledgerContext, String requestedModel,
 			PolicyDecision policy) {
 		return DecisionContext.rejected(ledgerContext, requestedModel, policy.decision(),
 				policy.reason(), policy.matchedRuleId());
-	}
-
-	/**
-	 * 4.1: the requested model does not fit the remaining budget - retry the
-	 * atomic reservation on cheaper policy-allowed models, cheapest first. If
-	 * nothing fits, the original 402 propagates. A declared tier bar (7.2) also
-	 * bounds this path: budget pressure never downgrades below the bar.
-	 */
-	private DowngradeOutcome downgradeForBudget(CanonicalChatRequest canonical, LedgerContext ledgerContext,
-			BudgetExceededException blocked, Integer minTier) {
-		for (DowngradeService.Candidate candidate : downgradeService
-				.cheaperAllowedAlternatives(canonical, ledgerContext, minTier).stream().limit(3).toList()) {
-			CanonicalChatRequest alternative = new CanonicalChatRequest(candidate.model(),
-					canonical.messages(), canonical.maxTokens(), canonical.stream());
-			try {
-				return new DowngradeOutcome(alternative, budgetGuard.reserve(alternative, ledgerContext));
-			} catch (BudgetExceededException stillBlocked) {
-				// try the next candidate
-			}
-		}
-		throw blocked;
-	}
-
-	private ChatCompletionResponse render(CanonicalChatRequest request, CanonicalChatResponse upstream) {
-		String id = upstream.id() != null ? upstream.id() : "chatcmpl-" + UUID.randomUUID();
-		String model = upstream.model() != null ? upstream.model() : request.model();
-		ChatCompletionResponse.Usage usage = upstream.usage() == null
-				? new ChatCompletionResponse.Usage(0, 0, 0)
-				: new ChatCompletionResponse.Usage(upstream.usage().inputTokens(), upstream.usage().outputTokens(),
-						upstream.usage().totalTokens());
-		return new ChatCompletionResponse(
-				id, "chat.completion", Instant.now().getEpochSecond(), model,
-				List.of(new ChatCompletionResponse.Choice(0,
-						new ChatMessage("assistant", upstream.content()),
-						upstream.finishReason() == null ? "stop" : upstream.finishReason())),
-				usage);
 	}
 
 	/**

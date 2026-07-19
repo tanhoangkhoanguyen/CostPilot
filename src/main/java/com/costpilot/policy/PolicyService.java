@@ -44,7 +44,8 @@ public class PolicyService {
 
 	// cache payload - a trimmed view of PolicyRule, JSON in Redis
 	@JsonInclude(JsonInclude.Include.NON_NULL)
-	record CachedRule(String id, String allowedModels, String fallbackAction, String downgradeTo) {
+	record CachedRule(String id, String allowedModels, String fallbackAction, String downgradeTo,
+			Long approvalThresholdNanos) {
 	}
 
 	public static String cacheKey(String scopeType, String scopeRef) {
@@ -84,8 +85,10 @@ public class PolicyService {
 		}
 		java.util.UUID ruleId = java.util.UUID.fromString(rule.id());
 		if (matches(rule.allowedModels(), model)) {
+			// carry the rule's cost gate (8.1): the controller escalates to approval only
+			// after it has the pre-flight estimate. Null threshold = plain allow.
 			return new PolicyDecision(PolicyDecision.Decision.ALLOW, model, ruleId,
-					"model allowed by " + matchedScope + " rule");
+					"model allowed by " + matchedScope + " rule", rule.approvalThresholdNanos());
 		}
 		return switch (rule.fallbackAction()) {
 			case "downgrade" -> new PolicyDecision(PolicyDecision.Decision.DOWNGRADE, rule.downgradeTo(), ruleId,
@@ -137,24 +140,31 @@ public class PolicyService {
 	private Optional<CachedRule> fromDb(String scopeType, String scopeRef) {
 		return rules.findByScopeTypeAndScopeRefAndActiveTrue(scopeType, scopeRef)
 				.map(r -> new CachedRule(r.getId().toString(), r.getAllowedModels(),
-						r.getFallbackAction(), r.getDowngradeTo()));
+						r.getFallbackAction(), r.getDowngradeTo(), r.getApprovalThresholdNanos()));
 	}
 
 	/** Create or update a rule; the cache is invalidated so it applies immediately. */
 	@Transactional
 	public PolicyRule upsertRule(String scopeType, String scopeRef, String allowedModels,
 			String fallbackAction, String downgradeTo) {
+		return upsertRule(scopeType, scopeRef, allowedModels, fallbackAction, downgradeTo, null);
+	}
+
+	/** As above, with the 8.1 approval cost threshold (nanodollars; null = no cost gate). */
+	@Transactional
+	public PolicyRule upsertRule(String scopeType, String scopeRef, String allowedModels,
+			String fallbackAction, String downgradeTo, Long approvalThresholdNanos) {
 		PolicyRule rule = rules.findByScopeTypeAndScopeRefAndActiveTrue(scopeType, scopeRef)
 				.map(existing -> {
-					existing.update(allowedModels, fallbackAction, downgradeTo);
+					existing.update(allowedModels, fallbackAction, downgradeTo, approvalThresholdNanos);
 					return existing;
 				})
-				.orElseGet(() -> rules.save(
-						new PolicyRule(scopeType, scopeRef, allowedModels, fallbackAction, downgradeTo)));
+				.orElseGet(() -> rules.save(new PolicyRule(scopeType, scopeRef, allowedModels, fallbackAction,
+						downgradeTo, approvalThresholdNanos)));
 		rules.flush();
 		evict(scopeType, scopeRef);
-		log.info("policy rule upserted scope={}:{} allowed=\"{}\" fallback={} rule={}",
-				scopeType, scopeRef, allowedModels, fallbackAction, rule.getId());
+		log.info("policy rule upserted scope={}:{} allowed=\"{}\" fallback={} threshold={} rule={}",
+				scopeType, scopeRef, allowedModels, fallbackAction, approvalThresholdNanos, rule.getId());
 		return rule;
 	}
 

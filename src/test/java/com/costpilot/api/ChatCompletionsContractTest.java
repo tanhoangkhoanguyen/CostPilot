@@ -40,7 +40,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.boot.test.context.TestConfiguration;
 
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 // 6.1: this is a controller contract slice - it mocks the governance beans and does NOT
 // exercise the real API-key filter (that's covered by AuthIT). Security is on the
@@ -81,9 +80,6 @@ class ChatCompletionsContractTest {
 	private PolicyService policyService;
 
 	@MockitoBean
-	private com.costpilot.budget.DowngradeService downgradeService;
-
-	@MockitoBean
 	private com.costpilot.budget.BudgetService budgetService;
 
 	@MockitoBean
@@ -92,18 +88,23 @@ class ChatCompletionsContractTest {
 	@MockitoBean
 	private com.costpilot.metrics.GovernanceMetrics metrics;
 
-	// 7.2: the controller now depends on the cost router. These contract tests never send
-	// X-CostPilot-Min-Tier, so route() is never called - the bean just has to exist for the
-	// web slice to load.
+	// Stage 8 / the route+budget pipeline now live behind the executor; the controller
+	// delegates to it for non-streaming and uses prepare() for streaming. The approval
+	// service is only touched on a REQUIRE_APPROVAL verdict (not in these ALLOW tests).
 	@MockitoBean
-	private com.costpilot.routing.RoutingService routingService;
+	private GovernedRequestExecutor executor;
+
+	@MockitoBean
+	private com.costpilot.approval.PendingApprovalService approvalService;
 
 	@org.junit.jupiter.api.BeforeEach
 	void guardAndPolicyAllowByDefault() {
-		when(budgetGuard.reserve(any(), any()))
-				.thenReturn(new BudgetGuard.GuardResult(java.util.List.of(), null, false));
 		when(policyService.evaluate(any(), any()))
 				.thenAnswer(inv -> PolicyDecision.allowDefault(inv.getArgument(1)));
+		// streaming path: prepare() returns a no-op reservation so relayStream runs
+		when(executor.prepare(any(), any(), any(), any(), any()))
+				.thenAnswer(inv -> new GovernedRequestExecutor.Prepared(inv.getArgument(0), inv.getArgument(1),
+						new BudgetGuard.GuardResult(java.util.List.of(), null, false)));
 	}
 
 	private static final String VALID_BODY = """
@@ -120,8 +121,12 @@ class ChatCompletionsContractTest {
 
 	@Test
 	void nonStreamingRelaysUpstreamJson() throws Exception {
-		when(forwardingService.forward(any(), any())).thenReturn(Mono.just(new CanonicalChatResponse(
-				"chatcmpl-1", "gpt-4o-mini", "hello costpilot", "stop", new Usage(9, 2))));
+		// the controller delegates non-streaming execution to the executor, which renders
+		// the OpenAI-shaped response. Reuse the real render() so the contract is exercised.
+		GovernedRequestExecutor realRender = new GovernedRequestExecutor(null, null, null, null, null, null);
+		when(executor.executeNonStreaming(any(), any(), any(), any(), any()))
+				.thenAnswer(inv -> realRender.render(inv.getArgument(0), new CanonicalChatResponse(
+						"chatcmpl-1", "gpt-4o-mini", "hello costpilot", "stop", new Usage(9, 2))));
 
 		mockMvc.perform(post("/v1/chat/completions")
 				.with(authentication(adminPrincipal()))
