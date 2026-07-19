@@ -33,6 +33,11 @@ public class PolicyRule {
 	@Column(name = "downgrade_to", columnDefinition = "text")
 	private String downgradeTo;
 
+	// 8.1: a request whose pre-flight MAX estimate exceeds this (exact nanodollars)
+	// requires human approval regardless of model. Null = no cost gate on this rule.
+	@Column(name = "approval_threshold_nanos")
+	private Long approvalThresholdNanos;
+
 	@Column(nullable = false)
 	private boolean active = true;
 
@@ -47,17 +52,29 @@ public class PolicyRule {
 
 	public PolicyRule(String scopeType, String scopeRef, String allowedModels,
 			String fallbackAction, String downgradeTo) {
+		this(scopeType, scopeRef, allowedModels, fallbackAction, downgradeTo, null);
+	}
+
+	public PolicyRule(String scopeType, String scopeRef, String allowedModels,
+			String fallbackAction, String downgradeTo, Long approvalThresholdNanos) {
 		this.scopeType = scopeType;
 		this.scopeRef = scopeRef;
 		this.allowedModels = allowedModels;
 		this.fallbackAction = fallbackAction;
 		this.downgradeTo = downgradeTo;
+		this.approvalThresholdNanos = approvalThresholdNanos;
 	}
 
 	public void update(String allowedModels, String fallbackAction, String downgradeTo) {
+		update(allowedModels, fallbackAction, downgradeTo, this.approvalThresholdNanos);
+	}
+
+	public void update(String allowedModels, String fallbackAction, String downgradeTo,
+			Long approvalThresholdNanos) {
 		this.allowedModels = allowedModels;
 		this.fallbackAction = fallbackAction;
 		this.downgradeTo = downgradeTo;
+		this.approvalThresholdNanos = approvalThresholdNanos;
 		this.updatedAt = Instant.now();
 	}
 
@@ -83,6 +100,10 @@ public class PolicyRule {
 
 	public String getDowngradeTo() {
 		return downgradeTo;
+	}
+
+	public Long getApprovalThresholdNanos() {
+		return approvalThresholdNanos;
 	}
 
 	public boolean isActive() {
