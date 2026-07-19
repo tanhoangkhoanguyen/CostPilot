@@ -72,6 +72,18 @@ public class GovernanceMetrics {
 		registry.counter("costpilot.routing.routed").increment();
 	}
 
+	/**
+	 * 7.3: dollars saved by routing/downgrading, accumulated as integer nanodollars
+	 * (same convention as the budget counters). A monotonically increasing sum - the
+	 * dashboard reads rate()/increase() over it and reconciles the total against the
+	 * ledger's savings column over a fixed window.
+	 */
+	public void recordRoutingSavings(long savingsNanos) {
+		if (savingsNanos > 0) {
+			registry.counter("costpilot.routing.savings_nanos").increment(savingsNanos);
+		}
+	}
+
 	public void recordTokens(long inputTokens, long outputTokens) {
 		registry.counter("costpilot.tokens", "direction", "input").increment(inputTokens);
 		registry.counter("costpilot.tokens", "direction", "output").increment(outputTokens);

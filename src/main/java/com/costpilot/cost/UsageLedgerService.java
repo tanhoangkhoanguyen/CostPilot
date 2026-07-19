@@ -40,12 +40,23 @@ public class UsageLedgerService {
 
 	public LedgerResult record(LedgerContext context, String provider, String model, Usage usage, Cost cost,
 			UUID priceId) {
+		return record(context, provider, model, usage, cost, priceId, null);
+	}
+
+	/**
+	 * @param savingsNanos 7.3: exact nanodollars saved by routing/downgrading this
+	 *            request vs its requested model, or null when no routing happened or the
+	 *            savings are unknown. Persisted on the fresh row so accumulated savings
+	 *            reconcile against the ledger over a window.
+	 */
+	public LedgerResult record(LedgerContext context, String provider, String model, Usage usage, Cost cost,
+			UUID priceId, Long savingsNanos) {
 		if (repository.existsByIdempotencyKey(context.idempotencyKey())) {
 			log.info("ledger replay ignored idempotencyKey={}", context.idempotencyKey());
 			return new LedgerResult(repository.findByIdempotencyKey(context.idempotencyKey()).orElseThrow(), false);
 		}
 		try {
-			UsageRecord saved = insert(context, provider, model, usage, cost, priceId);
+			UsageRecord saved = insert(context, provider, model, usage, cost, priceId, savingsNanos);
 			// live budget counters move only on a FRESH insert - ledger idempotency
 			// is exactly what makes the counters replay-safe (3.1)
 			budgetService.charge(BudgetScope.TENANT, saved.getTenantId(), cost.total());
@@ -63,11 +74,12 @@ public class UsageLedgerService {
 	// saveAndFlush runs in its own transaction (SimpleJpaRepository is @Transactional);
 	// a duplicate key surfaces here as DataIntegrityViolationException on flush
 	private UsageRecord insert(LedgerContext context, String provider, String model, Usage usage, Cost cost,
-			UUID priceId) {
+			UUID priceId, Long savingsNanos) {
 		UsageRecord record = new UsageRecord(
 				context.tenantId(), context.teamId(), context.projectId(), context.userId(),
 				context.environment(), provider, model,
 				usage.inputTokens(), usage.outputTokens(), cost.total(), priceId, context.idempotencyKey());
+		record.setSavingsNanos(savingsNanos);
 		UsageRecord saved = repository.saveAndFlush(record);
 		log.info("ledger write id={} provider={} model={} cost={} idempotencyKey={}",
 				saved.getId(), provider, model, cost.total().toPlainString(), context.idempotencyKey());
