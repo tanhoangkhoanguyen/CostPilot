@@ -39,8 +39,12 @@ public class SecurityConfig {
 						.requestMatchers("/actuator/health", "/actuator/health/**",
 								"/actuator/prometheus", "/mock/**")
 						.permitAll()
-						// admin-only surface: minting keys requires a tenant-admin key
-						.requestMatchers("/admin/keys/**").hasRole("ADMIN")
+						// admin-only control plane: key minting (6.1) + governance config and
+						// approvals (9.x) require a tenant-admin key. /admin/audit stays out of
+						// this list on purpose - it is team-scoped read for non-admins too.
+						.requestMatchers("/admin/keys/**", "/admin/budgets/**", "/admin/policies/**",
+								"/admin/approvals/**")
+						.hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.exceptionHandling(e -> e
 						// unauthenticated -> 401; authenticated-but-forbidden (e.g. a team

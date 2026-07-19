@@ -17,4 +17,14 @@ public enum BudgetScope {
 	public String dbValue() {
 		return dbValue;
 	}
+
+	/** Parse the db token (tenant|team|project|model); throws on anything else. */
+	public static BudgetScope fromDbValue(String value) {
+		for (BudgetScope scope : values()) {
+			if (scope.dbValue.equals(value)) {
+				return scope;
+			}
+		}
+		throw new IllegalArgumentException("unknown budget scope: " + value);
+	}
 }

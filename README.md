@@ -111,6 +111,35 @@ docker compose up -d
 
 Point your OpenAI-compatible SDK at `http://localhost:8080/v1` with a CostPilot key as the bearer token. For any real deploy also override `COSTPILOT_API_KEY_PEPPER` and mint fresh keys via `POST /admin/keys`.
 
+## Admin CLI (`costpilot`)
+
+Finance/platform run the control plane without a frontend - set budgets and policy, and act on approvals - via the `costpilot` CLI (a standalone Picocli app that talks to the gateway's admin API). Build it, then point it at the gateway with an admin key:
+
+```bash
+./gradlew :cli:installDist
+export COSTPILOT_ENDPOINT=http://localhost:8080
+export COSTPILOT_ADMIN_KEY=cp_admin_root      # dev key; use a minted key in prod
+
+CLI=cli/build/install/costpilot/bin/costpilot
+
+# governance config - takes effect at runtime, no redeploy
+$CLI budget set --scope team --ref research --limit 25.00
+$CLI policy set --scope-type team --scope-ref research \
+      --allowed "gpt-4o-mini,claude-*" --fallback require_approval
+$CLI budget ls
+$CLI policy ls
+
+# human-in-the-loop approvals (Stage 8)
+$CLI approvals ls
+$CLI approvals approve <pending-id>
+$CLI approvals reject  <pending-id> --reason "over quarter budget"
+
+# spend (grouped by team | project | model)
+$CLI spend show --group-by team
+```
+
+Every command has `--help`, exits non-zero on error, and reads the endpoint + admin key from `--endpoint`/`--admin-key` flags or the `COSTPILOT_ENDPOINT`/`COSTPILOT_ADMIN_KEY` env vars.
+
 ## Load-test numbers (k6, reproducible)
 
 One command runs the whole benchmark - stack up, budgets seeded, three k6 scenarios, then the claims are verified straight from the Postgres ledger:
