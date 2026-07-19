@@ -27,8 +27,8 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		// bump this when adding a migration; V12 added admin_audit (9.1)
-		assertThat(applied).isEqualTo(12);
+		// bump this when adding a migration; V13 added prompt_cache + pgvector (10.1)
+		assertThat(applied).isEqualTo(13);
 		assertThat(failed).isZero();
 	}
 

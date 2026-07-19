@@ -5,6 +5,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
@@ -12,7 +13,10 @@ public class TestcontainersConfiguration {
 	@Bean
 	@ServiceConnection
 	PostgreSQLContainer<?> postgresContainer() {
-		return new PostgreSQLContainer<>("postgres:16-alpine");
+		// pgvector image (10.1): ships the `vector` extension the semantic cache needs;
+		// aliased as postgres so PostgreSQLContainer recognizes it.
+		return new PostgreSQLContainer<>(
+				DockerImageName.parse("pgvector/pgvector:pg16").asCompatibleSubstituteFor("postgres"));
 	}
 
 	@Bean

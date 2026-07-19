@@ -14,6 +14,8 @@ services:
       COSTPILOT_KAFKA_BOOTSTRAP: kafka:29092
       COSTPILOT_CLICKHOUSE_ENABLED: "true"
       COSTPILOT_CLICKHOUSE_HOST: clickhouse
+      # Stage 10 semantic cache: opt-in spend reduction, off by default
+      COSTPILOT_CACHE_ENABLED: ${COSTPILOT_CACHE_ENABLED:-false}
       COSTPILOT_UPSTREAM_MODE: ${COSTPILOT_UPSTREAM_MODE:-mock}
       # pace the embedded mock at 5ms/token so the mid-stream cutoff demo lands in
       # seconds instead of brushing the 30s SSE timeout
@@ -37,7 +39,9 @@ services:
       retries: 30
 
   postgres:
-    image: postgres:16-alpine
+    # pgvector image (Stage 10 semantic cache): drop-in postgres 16 + the `vector`
+    # extension. Same PGDATA layout as postgres:16-alpine.
+    image: pgvector/pgvector:pg16
     container_name: costpilot-postgres
     environment:
       POSTGRES_DB: costpilot
