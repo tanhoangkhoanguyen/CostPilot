@@ -17,6 +17,7 @@ import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.core.model.UsageEvent;
 import com.costpilot.cost.AuditService;
+import com.costpilot.cost.Cost;
 import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
 import com.costpilot.cost.DecisionContext;
@@ -91,8 +92,13 @@ public class ForwardingService {
 		try {
 			CostService.Priced priced = costService.pricedCostFor(
 					adapter.providerId(), request.model(), usage, requestedAt);
+			// 7.3: counterfactual savings - what this same token usage WOULD have cost on
+			// the model the client originally asked for, minus what it actually cost on the
+			// cheaper routed/downgraded model. Only meaningful when the two differ.
+			java.math.BigDecimal savings = counterfactualSavings(decision, usage, priced.cost(), requestedAt);
+			Long savingsNanos = savings != null ? BudgetService.toNanos(savings) : null;
 			UsageLedgerService.LedgerResult result = usageLedger.record(decision.ledger(), adapter.providerId(),
-					request.model(), usage, priced.cost(), priced.price().getId());
+					request.model(), usage, priced.cost(), priced.price().getId(), savingsNanos);
 			// audit + event only on a fresh insert - a replayed request is already
 			// recorded, so this is exactly one audit row / one usage event per forwarded
 			// request (5.1, 5.2), reusing the ledger's replay-safe gate
@@ -102,6 +108,10 @@ public class ForwardingService {
 				publishEvent(decision, adapter.providerId(), usage, priced.cost().total(), audit);
 				// count tokens once per billed request (fresh insert = not a replay)
 				metrics.recordTokens(usage.inputTokens(), usage.outputTokens());
+				// 7.3: accumulate routing savings once per billed request, same replay gate
+				if (savingsNanos != null) {
+					metrics.recordRoutingSavings(savingsNanos);
+				}
 			}
 		} catch (PriceNotFoundException e) {
 			// unpriced model: nothing to ledger yet; the request itself must not fail
@@ -109,6 +119,41 @@ public class ForwardingService {
 			// forwarded request is explainable (5.1).
 			log.warn("skipping ledger write: {}", e.getMessage());
 			auditService.recordForwarded(decision, adapter.providerId(), usage, null, null);
+		}
+	}
+
+	/**
+	 * 7.3: the money saved by routing/downgrading this request. Re-prices the actual
+	 * observed token usage against the model the client originally requested, using the
+	 * price version active at request time (2.3), and returns requested-cost minus
+	 * actual-cost, floored at zero.
+	 *
+	 * <p>Returns null when there is nothing to measure: the executed model equals the
+	 * requested one (no routing happened), or the requested model has no price on record.
+	 * The counterfactual is a documented approximation - it charges the requested model
+	 * for the output tokens the executed model actually produced, not for a fresh run of
+	 * the requested model.
+	 */
+	private java.math.BigDecimal counterfactualSavings(DecisionContext decision, Usage usage,
+			Cost actualCost, Instant requestedAt) {
+		String requestedModel = decision.requestedModel();
+		if (requestedModel == null || requestedModel.equals(decision.executedModel())) {
+			return null;
+		}
+		try {
+			String requestedProvider = registry.forModel(requestedModel).providerId();
+			Cost counterfactual = costService.costFor(requestedProvider, requestedModel, usage, requestedAt);
+			java.math.BigDecimal savings = counterfactual.total().subtract(actualCost.total());
+			java.math.BigDecimal floored = savings.signum() > 0 ? savings : java.math.BigDecimal.ZERO;
+			log.info("routing savings requested={} executed={} counterfactual={} actual={} savings={}",
+					requestedModel, decision.executedModel(), counterfactual.total().toPlainString(),
+					actualCost.total().toPlainString(), floored.toPlainString());
+			return floored;
+		} catch (PriceNotFoundException e) {
+			// requested model unpriced: savings unknown, not zero - skip rather than
+			// understate. The request itself is unaffected.
+			log.warn("routing savings unknown: {}", e.getMessage());
+			return null;
 		}
 	}
 
