@@ -33,6 +33,14 @@ public record DecisionContext(
 				reason, matchedRuleId, blockedScope, new AtomicReference<>());
 	}
 
+	// A cost-routing swap (7.2): the request declared a quality bar and the router picked
+	// the cheapest policy-allowed model meeting it; reason says which bar and why.
+	public static DecisionContext routed(LedgerContext ledger, String requestedModel, String executedModel,
+			String reason) {
+		return new DecisionContext(ledger, requestedModel, executedModel, PolicyDecision.Decision.ROUTE,
+				reason, null, null, new AtomicReference<>());
+	}
+
 	// A rejection (DENY / REQUIRE_APPROVAL): nothing executes, so executedModel is null.
 	public static DecisionContext rejected(LedgerContext ledger, String requestedModel,
 			PolicyDecision.Decision decision, String reason, java.util.UUID matchedRuleId) {

@@ -67,6 +67,11 @@ public class GovernanceMetrics {
 		registry.counter("costpilot.downgrades", "reason", reason).increment();
 	}
 
+	/** 7.2: a request was cost-routed to a cheaper model that met its declared tier bar. */
+	public void routed() {
+		registry.counter("costpilot.routing.routed").increment();
+	}
+
 	public void recordTokens(long inputTokens, long outputTokens) {
 		registry.counter("costpilot.tokens", "direction", "input").increment(inputTokens);
 		registry.counter("costpilot.tokens", "direction", "output").increment(outputTokens);

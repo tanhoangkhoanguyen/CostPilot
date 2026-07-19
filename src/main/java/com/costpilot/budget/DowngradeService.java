@@ -32,15 +32,28 @@ public class DowngradeService {
 	private final ModelPriceRepository prices;
 	private final CostEstimator estimator;
 	private final PolicyService policyService;
+	private final com.costpilot.routing.RoutingService routingService;
 
-	public DowngradeService(ModelPriceRepository prices, CostEstimator estimator, PolicyService policyService) {
+	public DowngradeService(ModelPriceRepository prices, CostEstimator estimator, PolicyService policyService,
+			com.costpilot.routing.RoutingService routingService) {
 		this.prices = prices;
 		this.estimator = estimator;
 		this.policyService = policyService;
+		this.routingService = routingService;
 	}
 
 	/** Cheaper policy-allowed alternatives to the request's model, cheapest first. */
 	public List<Candidate> cheaperAllowedAlternatives(CanonicalChatRequest request, LedgerContext context) {
+		return cheaperAllowedAlternatives(request, context, null);
+	}
+
+	/**
+	 * Same, but honoring a declared quality bar (7.2): when minTier is set, a
+	 * budget downgrade may only land on a model whose tier still meets the bar -
+	 * "cheaper" never means "below the bar the client declared".
+	 */
+	public List<Candidate> cheaperAllowedAlternatives(CanonicalChatRequest request, LedgerContext context,
+			Integer minTier) {
 		BigDecimal originalEstimate = prices.findAllLive().stream()
 				.filter(p -> p.getModel().equals(request.model()))
 				.findFirst()
@@ -54,6 +67,8 @@ public class DowngradeService {
 				.map(p -> new Candidate(p.getModel(), estimateFor(request, p)))
 				.filter(c -> c.estimatedCost().compareTo(originalEstimate) < 0)
 				.filter(c -> policyService.allows(context, c.model()))
+				.filter(c -> minTier == null || routingService.tierOf(c.model())
+						.map(tier -> tier >= minTier).orElse(false))
 				.sorted(Comparator.comparing(Candidate::estimatedCost))
 				.toList();
 		log.debug("downgrade candidates for model={}: {}", request.model(),

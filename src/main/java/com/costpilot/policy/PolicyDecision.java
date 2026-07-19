@@ -11,7 +11,8 @@ public record PolicyDecision(
 		String reason) {
 
 	public enum Decision {
-		ALLOW, DENY, DOWNGRADE, REQUIRE_APPROVAL
+		// ROUTE (7.2) is produced by the cost router, never by policy evaluation itself
+		ALLOW, DENY, DOWNGRADE, REQUIRE_APPROVAL, ROUTE
 	}
 
 	public static PolicyDecision allowDefault(String model) {
