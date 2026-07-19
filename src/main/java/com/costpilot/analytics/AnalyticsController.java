@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.costpilot.analytics.dto.BudgetUtilization;
 import com.costpilot.analytics.dto.DecisionCounts;
 import com.costpilot.analytics.dto.ReconciliationResult;
+import com.costpilot.analytics.dto.SavingsSummary;
 import com.costpilot.analytics.dto.SpendBucket;
 import com.costpilot.analytics.dto.TopSpender;
 import com.costpilot.analytics.dto.TrendPoint;
@@ -81,6 +82,13 @@ public class AnalyticsController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
 		return analytics.budgetUtilization(scope, from(from), to(to), teamScope());
+	}
+
+	@GetMapping("/savings")
+	public SavingsSummary savings(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+		return analytics.savings(from(from), to(to), teamScope());
 	}
 
 	@GetMapping("/reconcile")

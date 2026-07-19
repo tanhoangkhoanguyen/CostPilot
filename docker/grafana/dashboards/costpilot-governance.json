@@ -383,6 +383,30 @@
           "refId": "B"
         }
       ]
+    },
+    {
+      "id": 15,
+      "title": "Cost-routes (rate/min)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 64
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(costpilot_routing_routed_total[5m])) * 60",
+          "legendFormat": "routes/min",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }

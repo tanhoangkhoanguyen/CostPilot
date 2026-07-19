@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import com.costpilot.analytics.dto.BudgetUtilization;
 import com.costpilot.analytics.dto.DecisionCounts;
 import com.costpilot.analytics.dto.ReconciliationResult;
+import com.costpilot.analytics.dto.SavingsSummary;
 import com.costpilot.analytics.dto.SpendBucket;
 import com.costpilot.analytics.dto.TopSpender;
 import com.costpilot.analytics.dto.TrendPoint;
@@ -168,6 +169,19 @@ public class AnalyticsQueryService {
 					return new BudgetUtilization(b.getScopeRef(), usd(limitNanos), usd(spentNanos), util);
 				})
 				.toList();
+	}
+
+	// 7.3: routing/downgrade savings over the window, from the Postgres ledger (money
+	// truth) - not ClickHouse. wouldBeSpend = actual executed spend + savings, i.e. what
+	// the originally-requested models would have cost. Team-scoped for a non-admin (6.1).
+	public SavingsSummary savings(Instant from, Instant to, String teamScope) {
+		long savingsNanos = teamScope == null
+				? usageRepository.totalSavingsNanosBetween(from, to)
+				: usageRepository.totalSavingsNanosForTeamBetween(teamScope, from, to);
+		long actualNanos = BudgetService.toNanos(teamScope == null
+				? usageRepository.totalCostBetween(from, to)
+				: usageRepository.totalCostForTeamBetween(teamScope, from, to));
+		return new SavingsSummary(usd(savingsNanos), usd(actualNanos), usd(actualNanos + savingsNanos));
 	}
 
 	// 5.3/5.4 acceptance: ClickHouse totals reconcile with the Postgres ledger for a

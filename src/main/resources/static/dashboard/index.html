@@ -83,7 +83,7 @@
   /* ---- layout ---- */
   main{padding:16px 20px 40px; max-width:1440px; margin:0 auto}
   .grid{display:grid; grid-template-columns:repeat(12,1fr); gap:16px}
-  .kpis{grid-template-columns:repeat(5,1fr)}
+  .kpis{grid-template-columns:repeat(6,1fr)}
   .card{
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
     padding:16px; min-width:0;
@@ -148,7 +148,7 @@
   .reconcile-badge{display:inline-flex;align-items:center;gap:7px;font:600 12px/1 var(--mono)}
   .foot{margin-top:22px; color:var(--ink-faint); font-size:11.5px; text-align:center}
 
-  @media(max-width:1080px){ .kpis{grid-template-columns:repeat(2,1fr)} [class*=span-]{grid-column:span 12} }
+  @media(max-width:1080px){ .kpis{grid-template-columns:repeat(3,1fr)} [class*=span-]{grid-column:span 12} }
   @media(max-width:560px){ .kpis{grid-template-columns:1fr} .bar-scroll{overflow-x:auto} }
 </style>
 </head>
@@ -190,6 +190,7 @@
     <div class="card kpi"><span class="label">Requests</span><span class="value" id="k-req">-</span><span class="cap" id="k-req-cap">governed</span></div>
     <div class="card kpi"><span class="label">Mid-stream cutoffs</span><span class="value" id="k-cut">-</span><span class="cap" id="k-cut-cap">budget-killed in flight</span></div>
     <div class="card kpi"><span class="label">Downgrades + routes</span><span class="value" id="k-dr">-</span><span class="cap" id="k-dr-cap">cost actions taken</span></div>
+    <div class="card kpi"><span class="label">Routing savings</span><span class="value" id="k-sav" style="color:var(--good)">-</span><span class="cap" id="k-sav-cap">vs requested models</span></div>
     <div class="card kpi"><span class="label">Reconciliation</span><span class="value small" id="k-rec"><span class="reconcile-badge">-</span></span><span class="cap" id="k-rec-cap">ledger vs OLAP</span></div>
   </section>
 
@@ -322,6 +323,7 @@
       {scopeRef:"support",limitUsd:null,spentUsd:"38.21",utilization:null},
     ],
     reconcile:{postgresRows:40892, clickhouseRows:40892, postgresNanos:427152300000, clickhouseNanos:427152300000, reconciled:true},
+    savings:{routingSavingsUsd:"52.8317", actualSpendUsd:"427.19", wouldBeSpendUsd:"480.02"},
   };
 
   // ---------- fetch ----------
@@ -358,6 +360,13 @@
     document.getElementById("k-cut").style.color = (dec.cutoff>0)?cssVar("--cutoff"):"";
     document.getElementById("k-dr").textContent = nf.format((dec.downgrade||0)+(dec.route||0));
     document.getElementById("k-dr-cap").innerHTML = `<b>${nf.format(dec.downgrade||0)}</b> downgrade &middot; <b>${nf.format(dec.route||0)}</b> route`;
+
+    const sv = d.savings || {};
+    document.getElementById("k-sav").textContent = money(sv.routingSavingsUsd || 0);
+    const wb = toNum(sv.wouldBeSpendUsd), pct = wb>0 ? ((wb - toNum(sv.actualSpendUsd))/wb*100) : 0;
+    document.getElementById("k-sav-cap").innerHTML = pct>0
+      ? `<b>${pct.toFixed(1)}%</b> off would-be ${money(wb)}`
+      : "vs requested models";
 
     const rc = d.reconcile, el = document.getElementById("k-rec");
     const ok = rc.reconciled;
@@ -478,14 +487,14 @@
     const seq = ++loadSeq;
     if(!state.key){ renderSample("Enter an admin API key to load live analytics."); setKeyStatus(null); return; }
     try{
-      const [spendTeam, spendProject, spendModel, decisions, trends, util, reconcile, top] = await Promise.all([
+      const [spendTeam, spendProject, spendModel, decisions, trends, util, reconcile, savings, top] = await Promise.all([
         api("spend","groupBy=team"), api("spend","groupBy=project"), api("spend","groupBy=model"),
         api("decisions"), api("trends","interval=day"), api("budget-utilization","scope=team"),
-        api("reconcile"), api(`top-spenders`,`dimension=${state.topDim}&limit=12`),
+        api("reconcile"), api("savings"), api(`top-spenders`,`dimension=${state.topDim}&limit=12`),
       ]);
       if(seq!==loadSeq) return;
       state.live = true; hideBanner(); setKeyStatus("ok");
-      const d = { spend:{team:spendTeam,project:spendProject,model:spendModel}, decisions, trends, util, reconcile, top };
+      const d = { spend:{team:spendTeam,project:spendProject,model:spendModel}, decisions, trends, util, reconcile, savings, top };
       paint(d);
     }catch(err){
       if(seq!==loadSeq) return;
@@ -498,7 +507,7 @@
 
   function renderSample(msg){
     showBanner(msg + " Charts below are illustrative.");
-    paint({ spend:SAMPLE.spend, decisions:SAMPLE.decisions, trends:SAMPLE.trends, util:SAMPLE.util, reconcile:SAMPLE.reconcile, top:SAMPLE.top });
+    paint({ spend:SAMPLE.spend, decisions:SAMPLE.decisions, trends:SAMPLE.trends, util:SAMPLE.util, reconcile:SAMPLE.reconcile, savings:SAMPLE.savings, top:SAMPLE.top });
   }
 
   // paint holds the last dataset so dimension toggles re-render without refetch (sample)
