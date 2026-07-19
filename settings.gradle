@@ -3,3 +3,8 @@ plugins {
 }
 
 rootProject.name = 'costpilot'
+
+// 9.3: the costpilot admin CLI - a standalone Picocli app that talks to the gateway
+// over HTTP. Kept as its own subproject so it has no dependency on the app module and
+// does not touch the app's build, jacoco gate, or Docker image.
+include 'cli'
