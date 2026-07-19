@@ -24,6 +24,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.analytics.dto.ReconciliationResult;
+import com.costpilot.analytics.dto.SavingsSummary;
 import com.costpilot.analytics.dto.SpendBucket;
 import com.costpilot.core.model.Usage;
 import com.costpilot.cost.Cost;
@@ -121,6 +122,32 @@ class AnalyticsReconciliationIT {
 		assertThat(result.postgresNanos()).isEqualTo(result.clickhouseNanos());
 		assertThat(result.reconciled()).isTrue();
 		assertThat(result.clickhouseNanos()).isEqualTo(10_000_000L);
+	}
+
+	// 7.3: /savings sums usage_record.savings_nanos (Postgres money truth) over the window;
+	// wouldBeSpend = actual executed spend + savings. Only rows WITH savings contribute.
+	@Test
+	void savingsSummarySumsLedgerRoutingSavings() {
+		String team = "sav-" + UUID.randomUUID();
+		// cost 3m nanos, saved 2m; cost 7m nanos, saved 1m -> actual 10m, savings 3m, would-be 13m
+		seedWithSavings(team, 3_000_000L, 2_000_000L);
+		seedWithSavings(team, 7_000_000L, 1_000_000L);
+
+		SavingsSummary s = restTemplate.exchange(
+				"/api/analytics/savings?from={f}&to={t}",
+				org.springframework.http.HttpMethod.GET,
+				new org.springframework.http.HttpEntity<>(com.costpilot.security.AuthTestSupport.admin()),
+				SavingsSummary.class, t0.toString(), t1.toString()).getBody();
+
+		assertThat(s.routingSavingsUsd()).isEqualTo("0.003000000");
+		assertThat(s.actualSpendUsd()).isEqualTo("0.010000000");
+		assertThat(s.wouldBeSpendUsd()).isEqualTo("0.013000000");
+	}
+
+	private void seedWithSavings(String team, long costNanos, long savingsNanos) {
+		BigDecimal cost = BigDecimal.valueOf(costNanos).movePointLeft(9);
+		ledger.record(new LedgerContext(null, team, "proj", "user", "prod", "sav-" + UUID.randomUUID()),
+				"openai", "gpt-4o-mini", new Usage(10, 5), new Cost(cost, BigDecimal.ZERO), null, savingsNanos);
 	}
 
 	@Test

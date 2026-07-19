@@ -38,6 +38,12 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecord, UUID> 
 			+ "where u.createdAt >= :from and u.createdAt < :to")
 	long totalSavingsNanosBetween(@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
 
+	// 6.1/7.3: team-scoped routing savings over a window - a non-admin sees only its own.
+	@Query("select coalesce(sum(u.savingsNanos), 0) from UsageRecord u "
+			+ "where u.teamId = :team and u.createdAt >= :from and u.createdAt < :to")
+	long totalSavingsNanosForTeamBetween(@Param("team") String team,
+			@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
+
 	// 5.4 reconciliation: ledger cost sum over a half-open window [from, to). Compared
 	// against the ClickHouse total for the same window to prove the OLAP pipeline is exact.
 	@Query("select coalesce(sum(u.cost), 0) from UsageRecord u where u.createdAt >= :from and u.createdAt < :to")
