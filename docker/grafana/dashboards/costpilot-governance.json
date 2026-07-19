@@ -1,21 +1,40 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
-  "title": "CostPilot — Governance",
+  "title": "CostPilot \u00e2\u20ac\u201d Governance",
   "uid": "costpilot-governance",
-  "tags": ["costpilot"],
+  "tags": [
+    "costpilot"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "refresh": "5s",
-  "templating": { "list": [] },
+  "templating": {
+    "list": []
+  },
   "panels": [
     {
       "id": 1,
       "title": "Budget rejections (rate/min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "expr": "sum(rate(costpilot_budget_rejections_total[1m])) * 60",
@@ -28,81 +47,262 @@
       "id": 2,
       "title": "Budget rejections (total)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum(costpilot_budget_rejections_total)", "legendFormat": "rejections", "refId": "A" }
+        {
+          "expr": "sum(costpilot_budget_rejections_total)",
+          "legendFormat": "rejections",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 3,
       "title": "Downgrades by reason (rate/min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum by (reason) (rate(costpilot_downgrades_total[1m])) * 60", "legendFormat": "{{reason}}", "refId": "A" }
+        {
+          "expr": "sum by (reason) (rate(costpilot_downgrades_total[1m])) * 60",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 4,
       "title": "Mid-stream cutoffs (total)",
       "type": "stat",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum(costpilot_stream_cutoffs_total)", "legendFormat": "cutoffs", "refId": "A" }
+        {
+          "expr": "sum(costpilot_stream_cutoffs_total)",
+          "legendFormat": "cutoffs",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 5,
       "title": "Budget guard decision latency (p99)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "costpilot_budget_guard_seconds{quantile=\"0.99\"}", "legendFormat": "p99", "refId": "A" },
-        { "expr": "costpilot_budget_guard_seconds{quantile=\"0.95\"}", "legendFormat": "p95", "refId": "B" }
+        {
+          "expr": "costpilot_budget_guard_seconds{quantile=\"0.99\"}",
+          "legendFormat": "p99",
+          "refId": "A"
+        },
+        {
+          "expr": "costpilot_budget_guard_seconds{quantile=\"0.95\"}",
+          "legendFormat": "p95",
+          "refId": "B"
+        }
       ]
     },
     {
       "id": 6,
       "title": "Upstream latency by provider (p99)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "costpilot_upstream_seconds{quantile=\"0.99\"}", "legendFormat": "{{provider}} p99", "refId": "A" }
+        {
+          "expr": "costpilot_upstream_seconds{quantile=\"0.99\"}",
+          "legendFormat": "{{provider}} p99",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 7,
       "title": "Token throughput (per min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum by (direction) (rate(costpilot_tokens_total[1m])) * 60", "legendFormat": "{{direction}}", "refId": "A" }
+        {
+          "expr": "sum by (direction) (rate(costpilot_tokens_total[1m])) * 60",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 8,
       "title": "Soft-limit warnings (rate/min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum(rate(costpilot_budget_soft_limit_warnings_total[1m])) * 60", "legendFormat": "warnings/min", "refId": "A" }
+        {
+          "expr": "sum(rate(costpilot_budget_soft_limit_warnings_total[1m])) * 60",
+          "legendFormat": "warnings/min",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 9,
       "title": "Policy rejections by decision (rate/min)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "targets": [
-        { "expr": "sum by (decision) (rate(costpilot_policy_rejections_total[1m])) * 60", "legendFormat": "{{decision}}", "refId": "A" }
+        {
+          "expr": "sum by (decision) (rate(costpilot_policy_rejections_total[1m])) * 60",
+          "legendFormat": "{{decision}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Routing savings (total $)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(costpilot_routing_savings_nanos_total) / 1e9",
+          "legendFormat": "saved",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Routing savings ($/min)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(costpilot_routing_savings_nanos_total[5m])) * 60 / 1e9",
+          "legendFormat": "saved/min",
+          "refId": "A"
+        }
       ]
     }
   ]
