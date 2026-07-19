@@ -304,6 +304,85 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 12,
+      "title": "Cache savings (total $)",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 6
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(costpilot_cache_savings_nanos_total) / 1e9",
+          "legendFormat": "saved",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Cache hit ratio",
+      "type": "stat",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(costpilot_cache_hits_total) / clamp_min(sum(costpilot_cache_hits_total) + sum(costpilot_cache_misses_total), 1)",
+          "legendFormat": "hit ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Cache hits vs misses (rate/min)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 56
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(costpilot_cache_hits_total[5m])) * 60",
+          "legendFormat": "hits",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(costpilot_cache_misses_total[5m])) * 60",
+          "legendFormat": "misses",
+          "refId": "B"
+        }
+      ]
     }
   ]
 }
