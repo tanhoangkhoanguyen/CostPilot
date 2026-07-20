@@ -531,3 +531,159 @@ Deliberate scope boundaries — each is a "future work" note, not a gap:
 - **Kubernetes / autoscaling** — horizontal scale + HPA (scale/reliability, off-thesis for now).
 
 Intentionally deferred so the cost-governance story stays sharp.
+
+---
+
+# Post-1.0 — Real-Provider Validation (Stages 11–13)
+
+Stages 0–10 prove the governance guarantees against the **embedded mock upstream** (see
+`BENCHMARK.md`): 0 overspend under concurrent flood, 0.33-token worst-case mid-stream overshoot,
+100% clean `budget_cutoff`+`[DONE]`. These stages take the *same* guarantees and the *same*
+benchmark harness and re-validate them against a **real LLM provider (Vertex AI Gemini)** in a
+standalone deployment — turning "works against a $0 mock" into "validated against real Gemini
+streaming."
+
+**Honest scope split:** most of this is packaging, validation, and documentation reusing what
+already exists (`docker-compose.yml`, `COSTPILOT_UPSTREAM_MODE=real`, `loadtest/run.sh` with its
+ledger reconciliation + Prometheus quantile scrape). The **one genuinely new capability** is real
+Vertex AI auth: the existing `GeminiAdapter` targets the *Gemini Developer API*
+(`generativelanguage.googleapis.com`, static `x-goog-api-key`), whereas Vertex AI uses a different
+endpoint (`{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/...`)
+and short-lived **OAuth2 bearer tokens** from GCP Application Default Credentials — which nothing
+in the repo acquires today.
+
+**Scope guardrails unchanged:** no failover / health / latency routing is added here. The only
+reliability stance remains fail-open budget enforcement.
+
+---
+
+## Stage 11 — Real-provider readiness (Vertex AI Gemini upstream)
+
+*Outcome: the gateway forwards real, live Gemini streaming traffic with correct auth, still
+env/config-switchable, mock still the default so tests and dev stay $0.*
+
+### Issue 11.1 — Vertex AI auth via ADC (OAuth2 bearer tokens)
+- **Goal:** Authenticate real Vertex requests with short-lived OAuth2 tokens from GCP Application
+  Default Credentials — no static long-lived secret.
+- **What to do:**
+  - Add `google-auth-library-oauth2-http` (absent today).
+  - Token source: `GoogleCredentials.getApplicationDefault()` scoped to
+    `https://www.googleapis.com/auth/cloud-platform`; cache the access token and refresh before
+    expiry (no per-request auth round-trip on the hot path). ADC resolves identically from
+    `gcloud auth application-default login`, a service-account JSON via
+    `GOOGLE_APPLICATION_CREDENTIALS`, or GCE/Workload-Identity metadata.
+  - Widen the adapter auth seam: replace the raw `applyAuth(HttpHeaders, String apiKey)` with a
+    per-provider auth strategy so Vertex applies `Authorization: Bearer <token>` while the Gemini
+    Developer API keeps `x-goog-api-key` (both remain supported).
+- **Acceptance Criteria:**
+  - A live `:streamGenerateContent` call authenticates and streams.
+  - Token refreshes before expiry; no long-lived secret is baked into the image.
+  - Mock and Developer-API paths are unchanged.
+  - Unit test covers token caching + refresh.
+- **Tech/Technique:** `google-auth-library-oauth2-http`, ADC, cached `AccessToken`, provider auth strategy.
+
+### Issue 11.2 — Vertex endpoint shaping + config (project / location)
+- **Goal:** Build the Vertex URL/path, selectable by config, without breaking the Developer-API shape.
+- **What to do:**
+  - Extend `UpstreamProperties.Provider` (today only `baseUrl` + `apiKey`) with `project` +
+    `location`, and add a Gemini `flavor` (`developer | vertex`) via
+    `COSTPILOT_UPSTREAM_GEMINI_FLAVOR`, `_PROJECT`, `_LOCATION`.
+  - Vertex builds
+    `https://{location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:{streamGenerateContent|generateContent}`
+    (`?alt=sse` for streams).
+  - Reuse the existing request-body builder and SSE parser (Vertex and Developer-API
+    `GenerateContentResponse` bodies are compatible).
+- **Acceptance Criteria:**
+  - Switching developer↔vertex is config-only (no code change).
+  - Adapter unit tests cover both path builders; body/parse logic is shared, not duplicated.
+- **Tech/Technique:** `UpstreamProperties` extension, `@ConfigurationProperties`, adapter path builder.
+
+### Issue 11.3 — Model price rows + policy for the live Gemini model
+- **Goal:** The live model (e.g. `gemini-2.0-flash` / `gemini-1.5-flash`) is priced and
+  policy-allowed so budget/cutoff math is real, not mock.
+- **What to do:**
+  - Flyway migration adding effective-dated `model_price` rows at Vertex list price.
+  - Seed a validation team + policy that allows the live model.
+  - Verify cost math against a hand-calculated fixture.
+- **Acceptance Criteria:**
+  - A real Gemini response is ledgered at the correct nanodollar cost.
+  - The cutoff allowance derived from the price is meaningful.
+  - Price is versioned (2.3); historical cost never mutates.
+- **Tech/Technique:** Flyway `V*.sql`, `model_price` versioning, seed profile.
+
+### Issue 11.4 — Standalone deploy profile (no mock, secrets injected)
+- **Goal:** A reproducible "real-provider" startup that reuses the existing compose stack. No UI.
+- **What to do:**
+  - `docker-compose.real.yml` (or a documented env set) that flips `COSTPILOT_UPSTREAM_MODE=real`,
+    mounts the ADC service-account JSON read-only and sets `GOOGLE_APPLICATION_CREDENTIALS`, sets
+    `_FLAVOR=vertex` / `_PROJECT` / `_LOCATION`, keeps Postgres/Redis/Prometheus, and overrides
+    `COSTPILOT_API_KEY_PEPPER` (dev-default today).
+  - Add a `.env.example` (none exists) documenting the full real-provider env set.
+  - Document a one-command bring-up.
+- **Acceptance Criteria:**
+  - `docker compose ... up` yields a gateway that serves a live Gemini chat completion.
+  - Health, ledger, Redis counters, and `/actuator/prometheus` all populate against real traffic.
+  - No credential is baked into the image.
+- **Tech/Technique:** compose override, ADC volume mount, `.env.example`, existing Dockerfile.
+
+---
+
+## Stage 12 — Real-provider validation (the three guarantees, live)
+
+*Outcome: `BENCHMARK.md`'s three claims re-measured against live Gemini — ledger- and
+Prometheus-verified, honest about real-provider caveats. Reuses the `loadtest/run.sh` pattern
+(seed budgets → run k6 → reconcile from the Postgres ledger → scrape Prometheus).*
+
+### Issue 12.1 — Streaming-cutoff validation (live)
+- **Goal:** Prove mid-stream budget enforcement on a real Gemini stream.
+- **What to do:**
+  - Adapt `cutoff_scale`: a prompt that passes admission but overruns a tight cap against the live
+    model. Measure `worst_overshoot_tokens`, `finish_reason=budget_cutoff`, and clean `[DONE]`.
+  - Reconcile from the Postgres ledger, not the k6 self-report.
+- **Acceptance Criteria:**
+  - Overshoot within a documented token bound. Expect **> 0.33 tokens** due to provider chunk
+    granularity — Gemini may emit multi-token chunks, so the bound may be a few tokens; document it
+    honestly rather than asserting the mock's figure.
+  - 100% clean truncation signal (`budget_cutoff` + `[DONE]`), no dangling connection.
+- **Tech/Technique:** k6 stream scenario, ledger SQL reconciliation (reuse `run.sh`), real upstream.
+
+### Issue 12.2 — Concurrent budget-enforcement validation (live)
+- **Goal:** Prove 0 overspend with real, variable-latency, variable-token Gemini responses.
+- **What to do:**
+  - Adapt `overspend_flood`: concurrent teams against tight caps hitting the live model.
+  - Measure `breach_teams` and total spend vs cap from the ledger.
+- **Acceptance Criteria:**
+  - `breach_teams = 0`; ledger total ≤ configured caps (reservations block first).
+  - Reconciliation is exact against the ledger.
+- **Tech/Technique:** k6 flood scenario, ledger reconciliation, real upstream.
+
+### Issue 12.3 — Guard-latency validation (deployed)
+- **Goal:** Measure governance overhead in the deployed environment.
+- **What to do:**
+  - Run `guard_latency`; scrape `costpilot_budget_guard_seconds` p50/p95/p99 from Prometheus at the
+    measurement window (existing method).
+  - Note explicitly: guard latency is **upstream-independent**, so this validates the *deployment*,
+    not Gemini.
+- **Acceptance Criteria:**
+  - Guard p99 target documented and measured on a warm, uncontended host (the clean re-run
+    `BENCHMARK.md` already flags as pending).
+- **Tech/Technique:** k6, Prometheus quantile scrape, warm-host protocol.
+
+---
+
+## Stage 13 — Validation documentation
+
+*Outcome: `BENCHMARK.md` gains a real-provider section; claims stay honest.*
+
+### Issue 13.1 — Real-provider benchmark writeup
+- **Goal:** Document the live validation the same way the mock run is documented.
+- **What to do:**
+  - Add a `BENCHMARK.md` section covering: environment (deployed host, region), deployment setup
+    (compose profile), provider/model config (Vertex flavor, project/location, model id), workload
+    parameters, and measured results (overshoot, `breach_teams`, guard p50/95/99).
+  - State limitations: single deployment environment, provider-dependent latency, chunk granularity
+    affecting the overshoot bound, and real dollar cost incurred by the run.
+- **Acceptance Criteria:**
+  - Every published number traces to the Postgres ledger or Prometheus.
+  - Limitations are explicit; the resume line is *earned* by the documented results, not asserted.
+- **Tech/Technique:** markdown, reconciliation outputs from Stage 12.
