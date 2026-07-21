@@ -38,3 +38,12 @@ out/
 
 docs/superpowers/
 
+### Claude / local agent tooling ###
+.claude/
+.playwright-mcp/
+
+### Personal / confidential (never commit) ###
+intern-strategy-MASTER.*
+~$intern-strategy-MASTER.*
+resume.*
+
