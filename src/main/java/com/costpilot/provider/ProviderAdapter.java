@@ -19,8 +19,12 @@ public interface ProviderAdapter {
 	/** Stable provider id, e.g. "openai". Also the mock server path segment. */
 	String providerId();
 
-	/** Path of the chat endpoint relative to the provider base URL. */
-	String chatPath(CanonicalChatRequest request);
+	/**
+	 * Path of the chat endpoint relative to the provider base URL. Takes the resolved
+	 * provider config so a provider can shape the path from it - e.g. Vertex embeds the
+	 * project/location in the resource path while the Gemini Developer API does not (11.2).
+	 */
+	String chatPath(CanonicalChatRequest request, UpstreamProperties.Provider config);
 
 	/** Map the canonical request to the provider's wire format. */
 	Object buildUpstreamBody(CanonicalChatRequest request);

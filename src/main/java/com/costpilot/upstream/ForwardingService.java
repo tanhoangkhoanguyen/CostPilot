@@ -263,8 +263,12 @@ public class ForwardingService {
 	}
 
 	private WebClient.RequestHeadersSpec<?> exchange(ProviderAdapter adapter, CanonicalChatRequest request) {
+		String path = adapter.chatPath(request, properties.provider(adapter.providerId()));
+		// an adapter may fully qualify its URL (e.g. Vertex derives the host from the
+		// region); otherwise the path is relative to the provider base URL.
+		String uri = path.startsWith("http") ? path : baseUrl(adapter) + path;
 		WebClient.RequestBodySpec spec = webClient.post()
-				.uri(baseUrl(adapter) + adapter.chatPath(request))
+				.uri(uri)
 				.contentType(MediaType.APPLICATION_JSON);
 		if (properties.getMode() == UpstreamProperties.Mode.REAL) {
 			spec.headers(headers -> adapter.applyAuth(headers, properties.provider(adapter.providerId())));

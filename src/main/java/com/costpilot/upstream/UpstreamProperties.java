@@ -59,6 +59,10 @@ public class UpstreamProperties {
 		private String apiKey;
 		/** Gemini only (11.1): selects the auth strategy - api key vs ADC bearer token. */
 		private Flavor flavor = Flavor.DEVELOPER;
+		/** Vertex only (11.2): GCP project id, part of the Vertex resource path. */
+		private String project;
+		/** Vertex only (11.2): GCP region, e.g. us-central1 - part of host and path. */
+		private String location;
 
 		public String getBaseUrl() {
 			return baseUrl;
@@ -82,6 +86,22 @@ public class UpstreamProperties {
 
 		public void setFlavor(Flavor flavor) {
 			this.flavor = flavor;
+		}
+
+		public String getProject() {
+			return project;
+		}
+
+		public void setProject(String project) {
+			this.project = project;
+		}
+
+		public String getLocation() {
+			return location;
+		}
+
+		public void setLocation(String location) {
+			this.location = location;
 		}
 	}
 }
