@@ -27,8 +27,8 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		// bump this when adding a migration; V13 added prompt_cache + pgvector (10.1)
-		assertThat(applied).isEqualTo(13);
+		// bump this when adding a migration; V14 added live-model price + validation policy (11.3)
+		assertThat(applied).isEqualTo(14);
 		assertThat(failed).isZero();
 	}
 
@@ -36,11 +36,14 @@ class MigrationAndSeedIT {
 	void seedDataIsLoaded() {
 		assertThat(jdbc.queryForObject("select count(*) from tenant", Integer.class)).isEqualTo(1);
 		assertThat(jdbc.queryForObject("select name from tenant", String.class)).isEqualTo("acme");
-		// V8 adds a second team (research) for per-team isolation demos/tests
-		assertThat(jdbc.queryForObject("select count(*) from team", Integer.class)).isEqualTo(2);
+		// V8 adds a second team (research); V14 adds a third (validation) for the live run
+		assertThat(jdbc.queryForObject("select count(*) from team", Integer.class)).isEqualTo(3);
 		assertThat(jdbc.queryForObject(
 				"select name from team where id = '00000000-0000-0000-0000-000000000011'", String.class))
 				.isEqualTo("platform");
+		assertThat(jdbc.queryForObject(
+				"select name from team where id = '00000000-0000-0000-0000-000000000013'", String.class))
+				.isEqualTo("validation");
 		assertThat(jdbc.queryForObject(
 				"select name from project where id = '00000000-0000-0000-0000-000000000021'", String.class))
 				.isEqualTo("chatbot");
@@ -57,6 +60,38 @@ class MigrationAndSeedIT {
 				"select input_price_per_1k from model_price where provider = 'openai' and model = 'gpt-4o-mini'",
 				BigDecimal.class);
 		assertThat(input).isEqualByComparingTo("0.00015");
+	}
+
+	@Test
+	void liveValidationModelIsPricedAtVertexListAndVersioned() {
+		// 11.3: gemini-2.5-flash-lite at Vertex list price ($0.10/$0.40 per 1M tokens),
+		// as an open, version-1 row so historical ledger cost never mutates (2.3).
+		BigDecimal input = jdbc.queryForObject(
+				"select input_price_per_1k from model_price where model = 'gemini-2.5-flash-lite'", BigDecimal.class);
+		BigDecimal output = jdbc.queryForObject(
+				"select output_price_per_1k from model_price where model = 'gemini-2.5-flash-lite'", BigDecimal.class);
+		assertThat(input).isEqualByComparingTo("0.0001");
+		assertThat(output).isEqualByComparingTo("0.0004");
+
+		Integer version = jdbc.queryForObject(
+				"select version from model_price where model = 'gemini-2.5-flash-lite'", Integer.class);
+		Integer open = jdbc.queryForObject(
+				"select count(*) from model_price where model = 'gemini-2.5-flash-lite' and effective_to is null",
+				Integer.class);
+		assertThat(version).isEqualTo(1);
+		assertThat(open).isEqualTo(1);
+	}
+
+	@Test
+	void validationTeamPolicyAllowsOnlyTheLiveModel() {
+		String allowed = jdbc.queryForObject(
+				"select allowed_models from policy_rule where scope_type = 'team' and scope_ref = 'validation'",
+				String.class);
+		String fallback = jdbc.queryForObject(
+				"select fallback_action from policy_rule where scope_type = 'team' and scope_ref = 'validation'",
+				String.class);
+		assertThat(allowed).isEqualTo("gemini-2.5-flash-lite");
+		assertThat(fallback).isEqualTo("deny");
 	}
 
 	@Test

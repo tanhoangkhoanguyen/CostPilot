@@ -53,6 +53,19 @@ class CostCalculatorTest {
 	}
 
 	@Test
+	void geminiFlashLiteCostMatchesHandCalculationInNanodollars() {
+		// 11.3 live validation model, Vertex list price $0.10/$0.40 per 1M tokens:
+		// 10000 in x 0.0001/1k = 0.001 ; 4000 out x 0.0004/1k = 0.0016 ; total 0.0026 USD
+		Cost cost = calculator.calculate(
+				price("gemini", "gemini-2.5-flash-lite", "0.000100", "0.000400"),
+				new Usage(10_000, 4000));
+
+		assertThat(cost.total()).isEqualByComparingTo("0.0026");
+		// exact integer nanodollars, the unit the ledger actually charges
+		assertThat(com.costpilot.budget.BudgetService.toNanos(cost.total())).isEqualTo(2_600_000L);
+	}
+
+	@Test
 	void oddTokenCountsStayExactNoFloatingPointDrift() {
 		// 333 x 0.00015/1k = 0.00004995 - exact, would be dirty in double math
 		Cost cost = calculator.calculate(

@@ -144,9 +144,11 @@ class RoutingPolicyIT {
 	@Test
 	void budgetDowngradeCandidatesNeverFallBelowTheDeclaredBar() {
 		// "hello costpilot" = 15 chars -> 5 input tokens; 64 output tokens. Cheaper
-		// alternatives to claude-sonnet-4-5 normally start at gpt-4o-mini; with a
-		// tier>=3 bar only the frontier models cheaper than sonnet survive:
-		// gemini-2.5-pro (0.00064625) then gpt-4o (0.0006525)
+		// alternatives to claude-sonnet-4-5 now start at gemini-2.5-flash-lite (the
+		// cheapest priced model, 11.3) - budget downgrade ignores tier, so it lands on
+		// the cheapest allowed model. With a tier>=3 bar only the frontier models cheaper
+		// than sonnet survive: gemini-2.5-pro (0.00064625) then gpt-4o (0.0006525);
+		// flash-lite has no capability tier, so tier-routing never considers it.
 		com.costpilot.core.model.CanonicalChatRequest request = new com.costpilot.core.model.CanonicalChatRequest(
 				"claude-sonnet-4-5",
 				List.of(new com.costpilot.core.model.CanonicalChatRequest.Message("user", "hello costpilot")),
@@ -159,7 +161,7 @@ class RoutingPolicyIT {
 				.containsExactly("gemini-2.5-pro", "gpt-4o");
 
 		var withoutBar = downgradeService.cheaperAllowedAlternatives(request, context);
-		assertThat(withoutBar.get(0).model()).isEqualTo("gpt-4o-mini");
+		assertThat(withoutBar.get(0).model()).isEqualTo("gemini-2.5-flash-lite");
 	}
 
 	@Test
