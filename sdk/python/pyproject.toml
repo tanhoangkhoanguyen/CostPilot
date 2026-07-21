@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "costpilot"
+dynamic = ["version"]
+description = "Governance-first Python client for the CostPilot AI-spending gateway"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "khangpt2k6" }]
+keywords = ["llm", "openai", "gateway", "budget", "governance", "costpilot", "ai", "finops"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+dependencies = ["httpx>=0.24,<1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-asyncio>=0.21"]
+
+[project.urls]
+Homepage = "https://github.com/tanhoangkhoanguyen/CostPilot"
+Repository = "https://github.com/tanhoangkhoanguyen/CostPilot"
+Issues = "https://github.com/tanhoangkhoanguyen/CostPilot/issues"
+
+[tool.hatch.version]
+path = "src/costpilot/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/costpilot"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

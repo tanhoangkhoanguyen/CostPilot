@@ -1,0 +1,10 @@
+# Python build + local venv artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+.mypy_cache/
