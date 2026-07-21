@@ -39,7 +39,7 @@ public class AnthropicAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public String chatPath(CanonicalChatRequest request) {
+	public String chatPath(CanonicalChatRequest request, com.costpilot.upstream.UpstreamProperties.Provider config) {
 		return "/v1/messages";
 	}
 

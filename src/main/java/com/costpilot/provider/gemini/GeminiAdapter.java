@@ -41,9 +41,18 @@ public class GeminiAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public String chatPath(CanonicalChatRequest request) {
+	public String chatPath(CanonicalChatRequest request, UpstreamProperties.Provider config) {
 		String method = request.stream() ? "streamGenerateContent" : "generateContent";
-		String path = "/v1beta/models/" + request.model() + ":" + method;
+		String path;
+		if (config.getFlavor() == UpstreamProperties.Provider.Flavor.VERTEX) {
+			// Vertex fully qualifies the URL - host derives from the region so the operator
+			// only configures flavor/project/location; base body/parse logic is unchanged.
+			path = "https://" + config.getLocation() + "-aiplatform.googleapis.com"
+					+ "/v1/projects/" + config.getProject() + "/locations/" + config.getLocation()
+					+ "/publishers/google/models/" + request.model() + ":" + method;
+		} else {
+			path = "/v1beta/models/" + request.model() + ":" + method;
+		}
 		return request.stream() ? path + "?alt=sse" : path;
 	}
 

@@ -25,16 +25,38 @@ class GeminiAdapterTest {
 			new VertexTokenProvider(() -> new AccessToken("vertex-tok", Date.from(Instant.now().plusSeconds(3600)))));
 
 	@Test
-	void modelRidesInThePath() {
+	void modelRidesInThePathForDeveloperFlavor() {
+		Provider config = new Provider(); // defaults to DEVELOPER
 		CanonicalChatRequest nonStream = new CanonicalChatRequest("gemini-2.5-flash",
 				List.of(new CanonicalChatRequest.Message("user", "hi")), null, false);
 		CanonicalChatRequest stream = new CanonicalChatRequest("gemini-2.5-flash",
 				List.of(new CanonicalChatRequest.Message("user", "hi")), null, true);
 
-		assertThat(adapter.chatPath(nonStream))
+		assertThat(adapter.chatPath(nonStream, config))
 				.isEqualTo("/v1beta/models/gemini-2.5-flash:generateContent");
-		assertThat(adapter.chatPath(stream))
+		assertThat(adapter.chatPath(stream, config))
 				.isEqualTo("/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse");
+	}
+
+	@Test
+	void buildsVertexPathFromProjectAndLocation() {
+		Provider config = new Provider();
+		config.setFlavor(Provider.Flavor.VERTEX);
+		config.setProject("my-proj");
+		config.setLocation("us-central1");
+		CanonicalChatRequest nonStream = new CanonicalChatRequest("gemini-2.0-flash",
+				List.of(new CanonicalChatRequest.Message("user", "hi")), null, false);
+		CanonicalChatRequest stream = new CanonicalChatRequest("gemini-2.0-flash",
+				List.of(new CanonicalChatRequest.Message("user", "hi")), null, true);
+
+		// vertex fully qualifies the URL: the host derives from location, the path from
+		// project/location/model - so the operator only sets flavor/project/location
+		assertThat(adapter.chatPath(nonStream, config)).isEqualTo(
+				"https://us-central1-aiplatform.googleapis.com/v1/projects/my-proj/locations/us-central1"
+						+ "/publishers/google/models/gemini-2.0-flash:generateContent");
+		assertThat(adapter.chatPath(stream, config)).isEqualTo(
+				"https://us-central1-aiplatform.googleapis.com/v1/projects/my-proj/locations/us-central1"
+						+ "/publishers/google/models/gemini-2.0-flash:streamGenerateContent?alt=sse");
 	}
 
 	@Test
