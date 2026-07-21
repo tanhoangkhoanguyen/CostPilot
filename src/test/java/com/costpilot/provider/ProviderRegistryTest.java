@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.costpilot.provider.anthropic.AnthropicAdapter;
 import com.costpilot.provider.gemini.GeminiAdapter;
+import com.costpilot.provider.gemini.VertexTokenProvider;
 import com.costpilot.provider.openai.OpenAiAdapter;
 import com.costpilot.upstream.UpstreamProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,8 +18,13 @@ class ProviderRegistryTest {
 
 	private final ObjectMapper mapper = new ObjectMapper();
 	private final UpstreamProperties properties = new UpstreamProperties();
+	// routing tests never authenticate, so the token source is never invoked
+	private final VertexTokenProvider vertexTokens = new VertexTokenProvider(() -> {
+		throw new UnsupportedOperationException("vertex auth not exercised in routing tests");
+	});
 	private final ProviderRegistry registry = new ProviderRegistry(
-			List.of(new OpenAiAdapter(mapper), new AnthropicAdapter(mapper), new GeminiAdapter(mapper)),
+			List.of(new OpenAiAdapter(mapper), new AnthropicAdapter(mapper),
+					new GeminiAdapter(mapper, vertexTokens)),
 			properties);
 
 	@Test

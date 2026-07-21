@@ -56,7 +56,8 @@ public class OpenAiAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public void applyAuth(HttpHeaders headers, String apiKey) {
+	public void applyAuth(HttpHeaders headers, com.costpilot.upstream.UpstreamProperties.Provider config) {
+		String apiKey = config.getApiKey();
 		if (apiKey != null && !apiKey.isBlank()) {
 			headers.setBearerAuth(apiKey);
 		}

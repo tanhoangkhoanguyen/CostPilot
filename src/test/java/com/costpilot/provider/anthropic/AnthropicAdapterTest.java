@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.upstream.UpstreamProperties.Provider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,8 +48,12 @@ class AnthropicAdapterTest {
 
 	@Test
 	void appliesApiKeyAndVersionHeaders() {
+		Provider config = new Provider();
+		config.setApiKey("sk-ant-test");
 		HttpHeaders headers = new HttpHeaders();
-		adapter.applyAuth(headers, "sk-ant-test");
+
+		adapter.applyAuth(headers, config);
+
 		assertThat(headers.getFirst("x-api-key")).isEqualTo("sk-ant-test");
 		assertThat(headers.getFirst("anthropic-version")).isEqualTo(AnthropicAdapter.ANTHROPIC_VERSION);
 	}

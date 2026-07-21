@@ -11,6 +11,7 @@ import org.springframework.http.HttpHeaders;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.upstream.UpstreamProperties.Provider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -95,12 +96,18 @@ class OpenAiAdapterTest {
 	@Test
 	void appliesBearerAuthOnlyWhenKeyPresent() {
 		HttpHeaders with = new HttpHeaders();
-		adapter.applyAuth(with, "sk-test");
+		adapter.applyAuth(with, config("sk-test"));
 		assertThat(with.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer sk-test");
 
 		HttpHeaders without = new HttpHeaders();
-		adapter.applyAuth(without, null);
-		adapter.applyAuth(without, "");
+		adapter.applyAuth(without, config(null));
+		adapter.applyAuth(without, config(""));
 		assertThat(without.containsKey(HttpHeaders.AUTHORIZATION)).isFalse();
+	}
+
+	private static Provider config(String apiKey) {
+		Provider provider = new Provider();
+		provider.setApiKey(apiKey);
+		return provider;
 	}
 }

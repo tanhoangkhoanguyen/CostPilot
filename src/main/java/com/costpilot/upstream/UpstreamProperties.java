@@ -44,9 +44,21 @@ public class UpstreamProperties {
 	}
 
 	public static class Provider {
+
+		/**
+		 * Gemini auth/endpoint flavor (11.1). DEVELOPER is the Gemini Developer API
+		 * (x-goog-api-key); VERTEX is Vertex AI (OAuth2 bearer via ADC). Ignored by
+		 * non-Gemini providers.
+		 */
+		public enum Flavor {
+			DEVELOPER, VERTEX
+		}
+
 		/** Base URL used when mode = REAL, e.g. https://api.openai.com */
 		private String baseUrl;
 		private String apiKey;
+		/** Gemini only (11.1): selects the auth strategy - api key vs ADC bearer token. */
+		private Flavor flavor = Flavor.DEVELOPER;
 
 		public String getBaseUrl() {
 			return baseUrl;
@@ -62,6 +74,14 @@ public class UpstreamProperties {
 
 		public void setApiKey(String apiKey) {
 			this.apiKey = apiKey;
+		}
+
+		public Flavor getFlavor() {
+			return flavor;
+		}
+
+		public void setFlavor(Flavor flavor) {
+			this.flavor = flavor;
 		}
 	}
 }
