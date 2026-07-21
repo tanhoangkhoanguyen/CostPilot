@@ -1,0 +1,37 @@
+# Real-provider deploy profile (11.4). Layer this over the base stack to flip the
+# gateway off the embedded $0 mock and onto real provider endpoints - no code
+# change, only env + a mounted credential. Bring up with:
+#
+#   cp .env.example .env    # fill in project / pepper / credentials path
+#   docker compose -f docker-compose.yml -f docker-compose.real.yml up --build -d
+#
+# Everything else (Postgres, Redis, Kafka, ClickHouse, Prometheus, Grafana) is
+# inherited unchanged from docker-compose.yml, so the ledger, Redis counters and
+# /actuator/prometheus all populate against live traffic.
+services:
+  gateway:
+    environment:
+      # embedded mock -> live provider endpoints
+      COSTPILOT_UPSTREAM_MODE: real
+
+      # Gemini via Vertex AI: ADC OAuth2 bearer auth, endpoint host derived from
+      # location (base-url unused for this flavor).
+      COSTPILOT_UPSTREAM_GEMINI_FLAVOR: ${COSTPILOT_UPSTREAM_GEMINI_FLAVOR:-vertex}
+      COSTPILOT_UPSTREAM_GEMINI_PROJECT: ${COSTPILOT_UPSTREAM_GEMINI_PROJECT:?set COSTPILOT_UPSTREAM_GEMINI_PROJECT in .env}
+      COSTPILOT_UPSTREAM_GEMINI_LOCATION: ${COSTPILOT_UPSTREAM_GEMINI_LOCATION:-us-central1}
+      # the Google auth library reads the mounted service-account JSON from here
+      GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/adc.json
+
+      # never ship the dev-default pepper: the seeded key hashes are computed with
+      # it, so a real deploy MUST override it and mint fresh keys via POST /admin/keys
+      COSTPILOT_API_KEY_PEPPER: ${COSTPILOT_API_KEY_PEPPER:?set COSTPILOT_API_KEY_PEPPER in .env}
+
+      # optional static-key providers (blank -> disabled)
+      COSTPILOT_UPSTREAM_OPENAI_API_KEY: ${COSTPILOT_UPSTREAM_OPENAI_API_KEY:-}
+      COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY: ${COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY:-}
+      # only used when COSTPILOT_UPSTREAM_GEMINI_FLAVOR=developer
+      COSTPILOT_UPSTREAM_GEMINI_API_KEY: ${COSTPILOT_UPSTREAM_GEMINI_API_KEY:-}
+    volumes:
+      # service-account JSON, read-only. Host path is configurable; the file must be
+      # readable by the non-root container user (chmod 644 it). Never baked into the image.
+      - ${GOOGLE_APPLICATION_CREDENTIALS_HOST:-./secrets/adc.json}:/var/secrets/adc.json:ro

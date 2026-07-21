@@ -114,7 +114,7 @@ Streaming requests bypass the cache (a cached answer is a complete response).
 
 ## Going live with real providers
 
-Switching upstreams is env-only, never a code change:
+Switching upstreams is env-only, never a code change. Quick OpenAI/Anthropic swap:
 
 ```bash
 COSTPILOT_UPSTREAM_MODE=real \
@@ -122,6 +122,16 @@ COSTPILOT_UPSTREAM_OPENAI_API_KEY=sk-... \
 COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY=sk-ant-... \
 docker compose up -d
 ```
+
+**Reproducible deploy profile (Gemini via Vertex AI).** For a repeatable real-provider bring-up with the credential injected at runtime (never baked into the image), use the `docker-compose.real.yml` overlay plus a `.env`:
+
+```bash
+cp .env.example .env                        # fill in project, pepper, credentials path
+cp /path/to/service-account.json secrets/adc.json && chmod 644 secrets/adc.json
+docker compose -f docker-compose.yml -f docker-compose.real.yml up --build -d
+```
+
+The overlay flips `COSTPILOT_UPSTREAM_MODE=real`, sets the Vertex `flavor`/`project`/`location`, mounts the service-account JSON **read-only** at `/var/secrets/adc.json` (ADC OAuth2 bearer auth), and overrides the dev pepper. The rest of the stack (Postgres, Redis, Kafka, ClickHouse, Prometheus, Grafana) is inherited unchanged, so health, the ledger, Redis counters, and `/actuator/prometheus` all populate against live traffic. `.env` and `secrets/*.json` are gitignored - no credential ever reaches git or the image.
 
 Point your OpenAI-compatible SDK at `http://localhost:8080/v1` with a CostPilot key as the bearer token. For any real deploy also override `COSTPILOT_API_KEY_PEPPER` and mint fresh keys via `POST /admin/keys`.
 
