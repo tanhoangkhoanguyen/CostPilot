@@ -71,6 +71,11 @@ costpilot:
       gemini:
         base-url: ${COSTPILOT_UPSTREAM_GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
         api-key: ${COSTPILOT_UPSTREAM_GEMINI_API_KEY:}
+        # developer -> Gemini Developer API (x-goog-api-key); vertex -> Vertex AI (ADC
+        # bearer). vertex derives its host from location, so base-url is unused there.
+        flavor: ${COSTPILOT_UPSTREAM_GEMINI_FLAVOR:developer}
+        project: ${COSTPILOT_UPSTREAM_GEMINI_PROJECT:}
+        location: ${COSTPILOT_UPSTREAM_GEMINI_LOCATION:}
     # explicit model -> provider overrides; anything unlisted falls back to
     # model-id prefix convention (claude* -> anthropic, gemini* -> gemini, else openai)
     model-providers: {}

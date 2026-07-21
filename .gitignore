@@ -47,3 +47,7 @@ intern-strategy-MASTER.*
 ~$intern-strategy-MASTER.*
 resume.*
 
+### Real-provider deploy secrets (never commit) ###
+.env
+secrets/*.json
+
