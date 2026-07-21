@@ -267,8 +267,7 @@ public class ForwardingService {
 				.uri(baseUrl(adapter) + adapter.chatPath(request))
 				.contentType(MediaType.APPLICATION_JSON);
 		if (properties.getMode() == UpstreamProperties.Mode.REAL) {
-			spec.headers(headers -> adapter.applyAuth(headers,
-					properties.provider(adapter.providerId()).getApiKey()));
+			spec.headers(headers -> adapter.applyAuth(headers, properties.provider(adapter.providerId())));
 		}
 		return spec.bodyValue(adapter.buildUpstreamBody(request));
 	}

@@ -69,8 +69,9 @@ public class AnthropicAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public void applyAuth(HttpHeaders headers, String apiKey) {
+	public void applyAuth(HttpHeaders headers, com.costpilot.upstream.UpstreamProperties.Provider config) {
 		headers.set("anthropic-version", ANTHROPIC_VERSION);
+		String apiKey = config.getApiKey();
 		if (apiKey != null && !apiKey.isBlank()) {
 			headers.set("x-api-key", apiKey);
 		}

@@ -2,6 +2,8 @@ package com.costpilot.provider.gemini;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,13 +13,16 @@ import org.springframework.http.HttpHeaders;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.upstream.UpstreamProperties.Provider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.auth.oauth2.AccessToken;
 
 class GeminiAdapterTest {
 
 	private final ObjectMapper mapper = new ObjectMapper();
-	private final GeminiAdapter adapter = new GeminiAdapter(mapper);
+	private final GeminiAdapter adapter = new GeminiAdapter(mapper,
+			new VertexTokenProvider(() -> new AccessToken("vertex-tok", Date.from(Instant.now().plusSeconds(3600)))));
 
 	@Test
 	void modelRidesInThePath() {
@@ -51,10 +56,28 @@ class GeminiAdapterTest {
 	}
 
 	@Test
-	void appliesGoogApiKeyHeader() {
+	void appliesGoogApiKeyHeaderForDeveloperFlavor() {
+		Provider config = new Provider();
+		config.setApiKey("g-key"); // flavor defaults to DEVELOPER
 		HttpHeaders headers = new HttpHeaders();
-		adapter.applyAuth(headers, "g-key");
+
+		adapter.applyAuth(headers, config);
+
 		assertThat(headers.getFirst("x-goog-api-key")).isEqualTo("g-key");
+		assertThat(headers.containsKey(HttpHeaders.AUTHORIZATION)).isFalse();
+	}
+
+	@Test
+	void appliesBearerAuthForVertexFlavor() {
+		Provider config = new Provider();
+		config.setFlavor(Provider.Flavor.VERTEX);
+		HttpHeaders headers = new HttpHeaders();
+
+		adapter.applyAuth(headers, config);
+
+		// Vertex authenticates with a short-lived ADC bearer token, not an api key
+		assertThat(headers.getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer vertex-tok");
+		assertThat(headers.containsKey("x-goog-api-key")).isFalse();
 	}
 
 	@Test

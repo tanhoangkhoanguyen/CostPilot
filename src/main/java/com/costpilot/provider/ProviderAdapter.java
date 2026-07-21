@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
+import com.costpilot.upstream.UpstreamProperties;
 
 /**
  * The single extension point for LLM providers. Adding a provider means
@@ -24,8 +25,13 @@ public interface ProviderAdapter {
 	/** Map the canonical request to the provider's wire format. */
 	Object buildUpstreamBody(CanonicalChatRequest request);
 
-	/** Apply provider-specific auth headers (no-op when the key is null/blank). */
-	void applyAuth(HttpHeaders headers, String apiKey);
+	/**
+	 * Apply provider-specific auth headers from the resolved provider config. The seam
+	 * takes the whole config (not just an api key) so a provider can choose its auth
+	 * strategy - e.g. Vertex applies an ADC bearer token while the Gemini Developer API
+	 * uses x-goog-api-key (11.1). No-op when no credential is available.
+	 */
+	void applyAuth(HttpHeaders headers, UpstreamProperties.Provider config);
 
 	/** Parse a provider non-streaming response body (JSON) to canonical, incl. usage. */
 	CanonicalChatResponse parseResponse(String body);

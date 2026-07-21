@@ -16,19 +16,23 @@ import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.provider.ProviderAdapter;
 import com.costpilot.provider.UpstreamParseException;
+import com.costpilot.upstream.UpstreamProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 // Gemini generateContent API: model rides in the URL, roles are user/model,
-// system prompt is systemInstruction, auth is x-goog-api-key, streaming is
-// :streamGenerateContent?alt=sse with full GenerateContentResponse chunks.
+// system prompt is systemInstruction, streaming is :streamGenerateContent?alt=sse
+// with full GenerateContentResponse chunks. Auth is flavor-dependent: the Developer
+// API uses x-goog-api-key, Vertex AI uses an ADC OAuth2 bearer token (11.1).
 @Component
 public class GeminiAdapter implements ProviderAdapter {
 
 	private final ObjectMapper objectMapper;
+	private final VertexTokenProvider vertexTokenProvider;
 
-	public GeminiAdapter(ObjectMapper objectMapper) {
+	public GeminiAdapter(ObjectMapper objectMapper, VertexTokenProvider vertexTokenProvider) {
 		this.objectMapper = objectMapper;
+		this.vertexTokenProvider = vertexTokenProvider;
 	}
 
 	@Override
@@ -69,7 +73,13 @@ public class GeminiAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public void applyAuth(HttpHeaders headers, String apiKey) {
+	public void applyAuth(HttpHeaders headers, UpstreamProperties.Provider config) {
+		if (config.getFlavor() == UpstreamProperties.Provider.Flavor.VERTEX) {
+			// Vertex: short-lived ADC bearer token, no static api key on the image
+			headers.setBearerAuth(vertexTokenProvider.getAccessToken());
+			return;
+		}
+		String apiKey = config.getApiKey();
 		if (apiKey != null && !apiKey.isBlank()) {
 			headers.set("x-goog-api-key", apiKey);
 		}
