@@ -164,6 +164,21 @@ $CLI spend show --group-by team
 
 Every command has `--help`, exits non-zero on error, and reads the endpoint + admin key from `--endpoint`/`--admin-key` flags or the `COSTPILOT_ENDPOINT`/`COSTPILOT_ADMIN_KEY` env vars.
 
+## Python SDK (`pip install costpilot`)
+
+App developers can call the gateway with a governance-first client instead of pointing a raw OpenAI SDK at it and parsing headers by hand. It surfaces the runtime verdict as typed data - cache hits, budget warnings, model routing/downgrades, mid-stream `budget_cutoff`, and typed exceptions (`BudgetExceededError.scope`, `PolicyDeniedError.rule_id`, `ApprovalRequiredError`). Sync + async, one dependency (`httpx`).
+
+```python
+from costpilot import CostPilot, BudgetExceededError
+
+cp = CostPilot(base_url="http://localhost:8080/v1", api_key="cp_...", team="research")
+r = cp.chat.completions.create(model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "hi"}])
+print(r.content, r.governance.cache_hit, r.governance.budget_warning)
+```
+
+Source, quickstart, and streaming/async examples: [`sdk/python/`](sdk/python/). Tests run against a mocked transport (`pytest`, no gateway, $0).
+
 ## Load-test numbers (k6, reproducible)
 
 One command runs the whole benchmark - stack up, budgets seeded, three k6 scenarios, then the claims are verified straight from the Postgres ledger:
