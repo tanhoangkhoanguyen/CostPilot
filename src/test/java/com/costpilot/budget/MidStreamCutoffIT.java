@@ -52,8 +52,13 @@ class MidStreamCutoffIT {
 
 	private static final int WORDS = 2000;
 	private static final BigDecimal CAP = new BigDecimal("0.0013");
-	// one output token on gpt-4o-mini, the documented overshoot bound
-	private static final BigDecimal ONE_TOKEN = new BigDecimal("0.0000006");
+	// The overshoot bound is one streamed CHUNK, not one token (12.1): the meter now
+	// estimates tokens from content length (~4 chars/token) so the cutoff fires correctly
+	// on providers that pack many tokens per chunk. The mock's crossing chunk is "lorem "
+	// (6 chars ~= 1.5 tokens on gpt-4o-mini), so cost lands within ~2 output tokens of the
+	// cap. This is the honest bound - the earlier sub-token figure was an artifact of the
+	// mock emitting exactly one token per chunk.
+	private static final BigDecimal ONE_CHUNK = new BigDecimal("0.0000012"); // ~2 output tokens
 
 	@Test
 	void generationIsCutOffCleanlyTheInstantItWouldBreachBudget(CapturedOutput output) throws Exception {
@@ -104,7 +109,7 @@ class MidStreamCutoffIT {
 		assertThat(row.getOutputTokens()).isGreaterThan(0);
 		assertThat(row.getOutputTokens()).isLessThan(WORDS);
 		assertThat(row.getCost()).isGreaterThan(BigDecimal.ZERO);
-		assertThat(row.getCost()).isLessThanOrEqualTo(CAP.add(ONE_TOKEN));
+		assertThat(row.getCost()).isLessThanOrEqualTo(CAP.add(ONE_CHUNK));
 	}
 
 	@Test

@@ -37,18 +37,23 @@ const ALL = {
 	// math before the upstream call), so this validates the deployed host, not Gemini.
 	// The warmup soak warms JIT + counters and ages cold-start samples out of micrometer's
 	// ~2-min decaying quantile window before guard_latency measures.
+	// NOTE: rates are deliberately tiny. A fresh GCP project's default Vertex quota for
+	// gemini-2.5-flash-lite is only a few requests/minute; the mock harness's 50 rps
+	// instantly 429s. Guard latency is upstream-INDEPENDENT anyway, so a low request rate
+	// still yields a valid p50/p95/p99 — it just needs enough warm samples in micrometer's
+	// window, not high throughput.
 	guard: {
 		warmup: {
 			executor: 'constant-arrival-rate',
-			rate: 20, timeUnit: '1s', duration: '90s',
-			preAllocatedVUs: 20, maxVUs: 50,
+			rate: 1, timeUnit: '1s', duration: '40s',
+			preAllocatedVUs: 2, maxVUs: 3,
 			exec: 'latency',
 		},
 		guard_latency: {
 			executor: 'constant-arrival-rate',
-			rate: 50, timeUnit: '1s', duration: '20s',
-			startTime: '95s',
-			preAllocatedVUs: 40, maxVUs: 120,
+			rate: 1, timeUnit: '1s', duration: '30s',
+			startTime: '45s',
+			preAllocatedVUs: 2, maxVUs: 3,
 			exec: 'latency',
 		},
 	},
@@ -57,7 +62,7 @@ const ALL = {
 	flood: {
 		overspend_flood: {
 			executor: 'shared-iterations',
-			vus: 20, iterations: 90, maxDuration: '60s',
+			vus: 3, iterations: 15, maxDuration: '60s',
 			exec: 'flood',
 		},
 	},
@@ -68,7 +73,7 @@ const ALL = {
 	cutoff: {
 		cutoff_scale: {
 			executor: 'per-vu-iterations',
-			vus: 5, iterations: 1, maxDuration: '120s',
+			vus: 2, iterations: 1, maxDuration: '120s',
 			exec: 'cutoff',
 		},
 	},
@@ -122,14 +127,14 @@ export function flood() {
 }
 
 export function cutoff() {
-	// ask for a genuinely long generation; max_tokens sits well above what the tight cap
-	// can afford, so the stream is admitted (its per-request estimate fits) and then
-	// overruns mid-flight → mid-stream cutoff. Unlike the mock's echo prompt, we can't
-	// predict Gemini's exact token count, which is the point: the cap does the bounding.
+	// NO max_tokens on purpose (mirrors MidStreamCutoffIT): admission then reserves the
+	// 1024-token DEFAULT estimate, which fits under the cap → the request is ADMITTED.
+	// Gemini actually generates ~1239 tokens for this prompt, overrunning the cap
+	// mid-flight → mid-stream cutoff. The cap (set in run-live.sh, between the 1024-token
+	// estimate and the ~1239-token real generation) does the bounding, not max_tokens.
 	const r = post({
 		model: MODEL,
 		messages: [{ role: 'user', content: 'Write a detailed 1000-word story about a lighthouse keeper.' }],
-		max_tokens: 800,
 		stream: true,
 	}, { timeout: '110s' });
 	check(r, {

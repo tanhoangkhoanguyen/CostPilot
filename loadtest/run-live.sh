@@ -23,11 +23,16 @@ K6_IMAGE="grafana/k6:0.54.0"
 # (V14). The mock run.sh divides overshoot by gpt-4o-mini's 0.0000006 — the live run MUST
 # use the Gemini figure or worst_overshoot_tokens is wrong.
 OUT_TOK_USD=0.0000004
-# per-phase tight caps (USD). Sized so admission passes but generation overruns:
-#   flood  — tiny: ~a handful of the 90 requests get served, the rest blocked with 402
-#   cutoff — sized for a few hundred output tokens; the long generation overruns it
-FLOOD_CAP=0.00002
-CUTOFF_CAP=0.00015
+# per-phase tight caps (USD), sized against gemini-2.5-flash-lite's real behaviour here:
+#   flood  — $0.00012 admits ~2-3 of the concurrent requests (each reserves ~128 out
+#            tokens = ~$0.0000512) then blocks the rest with 402; proves spend <= cap.
+#   cutoff — the no-max_tokens request reserves the 1024-token DEFAULT estimate
+#            (~$0.00041); this prompt actually generates ~1240 tokens. A cap of $0.00045
+#            sits ABOVE the estimate (so admission passes) but BELOW the full generation
+#            (so it cuts off mid-stream). Too-low a cap (e.g. 0.00015) is denied at
+#            admission and never streams - there'd be nothing to cut off.
+FLOOD_CAP=0.00012
+CUTOFF_CAP=0.00045
 GUARD_CAP=1000
 
 # .env carries the pepper (needed to reproduce the key hash) + provider config; compose
@@ -98,15 +103,17 @@ SQL
 }
 
 # --- guard latency (deployment hot path) --------------------------------------------------
-# guard_latency runs at warmup+95s..+115s; micrometer quantiles decay after ~2min but
-# Prometheus scrapes every 5s, so read them back AT the window tail (same method as run.sh).
+# guard_latency runs at warmup(40s)+guard(30s) = the measured window is T0+45s..+75s.
+# micrometer quantiles decay after ~2min but Prometheus scrapes every 5s, so read them
+# back AT the window tail (same method as run.sh). Widen to [30s] since the low request
+# rate (1 rps, quota-limited) puts fewer samples in each 5s scrape.
 GUARD_T0=$(date +%s)
 run_phase guard "$GUARD_CAP"
-echo "== guard-only decision latency during the 50 RPS window (seconds)"
+echo "== guard-only decision latency during the measured window (seconds)"
 for q in 0.5 0.95 0.99; do
 	v=$(curl -s "http://localhost:9090/api/v1/query" \
-		--data-urlencode "query=max_over_time(costpilot_budget_guard_seconds{quantile=\"$q\"}[15s])" \
-		--data-urlencode "time=$((GUARD_T0 + 118))" \
+		--data-urlencode "query=max_over_time(costpilot_budget_guard_seconds{quantile=\"$q\"}[30s])" \
+		--data-urlencode "time=$((GUARD_T0 + 78))" \
 		| sed -E 's/.*"value":\[[0-9.]+,"([^"]+)".*/\1/')
 	echo "guard p$q: ${v}s"
 done
