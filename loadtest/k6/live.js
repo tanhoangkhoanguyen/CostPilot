@@ -26,19 +26,24 @@ const ADMIN = __ENV.ADMIN_KEY;
 const TEAM = 'validation';
 const MODEL = 'gemini-2.5-flash-lite';
 
-export const options = {
-	summaryTrendStats: ['avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
-	scenarios: {
-		// soak: warms JIT + rebuilds counters/caches, and ages cold-start samples out of
-		// micrometer's ~2-min decaying quantile window before guard_latency measures.
+// One 'validation' team is reused across all three claims, so they must NOT share a
+// budget cap. run-live.sh invokes k6 ONCE PER PHASE, re-seeding the cap between runs, and
+// selects the phase via __ENV.PHASE (guard | flood | cutoff). Only that phase's scenarios
+// are included. guard always drags its warmup soak along so micrometer quantiles are warm.
+const PHASE = __ENV.PHASE || 'guard';
+
+const ALL = {
+	// deployment hot-path test. Guard latency is upstream-INDEPENDENT (pure Redis/price
+	// math before the upstream call), so this validates the deployed host, not Gemini.
+	// The warmup soak warms JIT + counters and ages cold-start samples out of micrometer's
+	// ~2-min decaying quantile window before guard_latency measures.
+	guard: {
 		warmup: {
 			executor: 'constant-arrival-rate',
 			rate: 20, timeUnit: '1s', duration: '90s',
 			preAllocatedVUs: 20, maxVUs: 50,
 			exec: 'latency',
 		},
-		// deployment hot-path test. Guard latency is upstream-INDEPENDENT (pure Redis/price
-		// math before the upstream call), so this validates the deployed host, not Gemini.
 		guard_latency: {
 			executor: 'constant-arrival-rate',
 			rate: 50, timeUnit: '1s', duration: '20s',
@@ -46,25 +51,32 @@ export const options = {
 			preAllocatedVUs: 40, maxVUs: 120,
 			exec: 'latency',
 		},
-		// concurrent flood against a tight cap → most requests must be blocked at
-		// reservation (402) before any spend; run-live.sh proves ledger spend ≤ cap.
+	},
+	// concurrent flood against a tight cap → most requests must be blocked at reservation
+	// (402) before any spend; run-live.sh proves ledger spend ≤ cap.
+	flood: {
 		overspend_flood: {
 			executor: 'shared-iterations',
-			vus: 20, iterations: 90,
-			startTime: '125s', maxDuration: '60s',
+			vus: 20, iterations: 90, maxDuration: '60s',
 			exec: 'flood',
 		},
-		// concurrent long streams that pass admission but overrun mid-generation → forces a
-		// mid-stream budget_cutoff. Gemini emits multi-token chunks, so the ledger overshoot
-		// is bounded by ~one chunk's tokens (documented honestly in BENCHMARK.md), not the
-		// mock's 0.33.
+	},
+	// concurrent long streams that pass admission but overrun mid-generation → forces a
+	// mid-stream budget_cutoff. Gemini emits multi-token chunks, so the ledger overshoot
+	// is bounded by ~one chunk's tokens (documented honestly in BENCHMARK.md), not the
+	// mock's 0.33.
+	cutoff: {
 		cutoff_scale: {
 			executor: 'per-vu-iterations',
-			vus: 5, iterations: 1,
-			startTime: '195s', maxDuration: '120s',
+			vus: 5, iterations: 1, maxDuration: '120s',
 			exec: 'cutoff',
 		},
 	},
+};
+
+export const options = {
+	summaryTrendStats: ['avg', 'p(50)', 'p(95)', 'p(99)', 'max'],
+	scenarios: ALL[PHASE],
 	thresholds: {
 		// e2e time is context only and swings with provider latency; the DOCUMENTED target
 		// is guard-only p99 < 5ms, read from Prometheus by run-live.sh. Bound generously
