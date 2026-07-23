@@ -23,7 +23,13 @@ import reactor.util.function.Tuple2;
 
 // 1.3 acceptance: tokens flow through incrementally (no whole-response buffering)
 // and a client disconnect cancels the upstream call.
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+//
+// Mock pacing is pinned to 30ms/token here (default is 20). With ~30 tokens that is
+// ~900ms of server-side generation, so the client-side arrival window has wide margin
+// over the 150ms floor below - on a contended CI runner, paced SSE events can still
+// bunch on the consumer thread, and too tight a margin made this timing assertion flaky.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+		properties = "costpilot.mock-upstream.token-delay-ms=30")
 @Import(TestcontainersConfiguration.class)
 @ExtendWith(OutputCaptureExtension.class)
 class StreamingPassthroughIT {
@@ -68,8 +74,10 @@ class StreamingPassthroughIT {
 		long window = lastArrival - firstArrival;
 
 		// buffered-whole-response would deliver everything at ~the same instant;
-		// passthrough spreads arrivals across the mock's paced generation (~600ms)
-		assertThat(window).isGreaterThan(200);
+		// passthrough spreads arrivals across the mock's paced generation (~900ms at
+		// 30ms/token). The 150ms floor is well under that yet safely above the arrival
+		// bunching a loaded runner can introduce - the point is "clearly not one blob".
+		assertThat(window).isGreaterThan(150);
 		assertThat(timed.get(timed.size() - 1).getT2()).isEqualTo("[DONE]");
 	}
 
