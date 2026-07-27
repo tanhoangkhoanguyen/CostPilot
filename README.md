@@ -1,208 +1,119 @@
+<div align="center">
+
 # CostPilot
 
-An AI cost-governance gateway. Your apps call CostPilot instead of OpenAI / Anthropic / Gemini directly, and CostPilot decides - at runtime - who may use AI, which models, and how much budget, then enforces it.
+<a href="https://github.com/tanhoangkhoanguyen/CostPilot">
+  <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=21&pause=1200&color=F97316&center=true&vCenter=true&width=820&height=46&lines=Nobody+knew+who+was+spending+the+money.;The+bill+only+showed+up+at+the+end+of+the+month.;By+then+the+money+was+already+gone.;So+I+put+a+gate+in+front+of+the+models." alt="Nobody knew who was spending the money. The bill only showed up at the end of the month. By then the money was already gone. So I put a gate in front of the models." />
+</a>
 
-> **The headline claim:** Enforce dollar budgets *before and during* a response - estimate cost pre-flight, meter tokens mid-stream, and cut off cleanly if a request would overspend - without slowing developers down (single-digit-millisecond budget decision, p50 2.7 ms / p95 7.6 ms).
+**An AI spending gateway that says no before the money is gone.**
 
-## Architecture
+Your apps call CostPilot instead of OpenAI, Anthropic or Gemini.
+CostPilot decides, per request, at runtime: who may spend, on which model, and how much.
 
-```
-                        +---------------------------------------------+
-  your app ---------->  |                CostPilot gateway            |
-  POST /v1/chat/...     |                                             |
-  Bearer cp_...         |  auth -> policy -> pre-flight estimate      |
-                        |  -> budget reserve (Redis, atomic Lua)      |
-                        |  -> forward to provider (SSE passthrough)   |
-                        |  -> meter tokens mid-stream, cutoff on      |
-                        |     breach -> exact-price ledger (Postgres) |
-                        +----+----------+----------+---------+-------+
-                             |          |          |         |
-                        Postgres      Redis      Kafka   Prometheus
-                        (ledger,    (live       (usage    (metrics)
-                         budgets,    counters)   events)     |
-                         audit)                    |      Grafana
-                                               ClickHouse (dashboard)
-                                               (spend analytics)
-```
+<p>
+<img alt="Java 21" src="https://img.shields.io/badge/Java-21-e76f00?style=flat-square&logo=openjdk&logoColor=white">
+<img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?style=flat-square&logo=springboot&logoColor=white">
+<img alt="Postgres" src="https://img.shields.io/badge/Postgres-pgvector-4169E1?style=flat-square&logo=postgresql&logoColor=white">
+<img alt="Redis" src="https://img.shields.io/badge/Redis-counters-FF4438?style=flat-square&logo=redis&logoColor=white">
+<img alt="Kafka" src="https://img.shields.io/badge/Kafka-%E2%86%92%20ClickHouse-231F20?style=flat-square&logo=apachekafka&logoColor=white">
+<br>
+<a href="https://github.com/tanhoangkhoanguyen/CostPilot/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/tanhoangkhoanguyen/CostPilot/ci.yml?style=flat-square&label=build"></a>
+<img alt="Tests" src="https://img.shields.io/badge/tests-170%2B-16a34a?style=flat-square">
+<img alt="Guard latency" src="https://img.shields.io/badge/budget%20decision-p50%202.7ms-0ea5e9?style=flat-square">
+<img alt="Demo cost" src="https://img.shields.io/badge/demo%20cost-%240-7c3aed?style=flat-square">
+</p>
 
-- **Postgres** - source of truth: usage ledger (idempotent writes), budgets, policies, audit trail, versioned prices.
-- **Redis** - live remaining-budget counters; reservations are atomic Lua, fail-open by design.
-- **Kafka -> ClickHouse** - async usage events off the hot path, OLAP spend analytics with Postgres reconciliation.
-- **Prometheus + Grafana** - governance metrics scraped from `/actuator/prometheus`, auto-provisioned dashboard.
-- **Embedded mock LLM** - default upstream, so the demo below costs $0 and touches no real provider.
+<a href="docs/README.md"><b>Setup and usage docs</b></a> · <a href="ROADMAP.md">Roadmap</a> · <a href="BENCHMARK.md">Benchmarks</a>
 
-## 10-minute demo
+</div>
 
-Prereqs: Docker. Nothing else.
+---
+
+## What we kept seeing
+
+Every team that starts building on top of a model provider goes through the same three months.
+
+Month one is fun. Somebody drops an API key into a config file, ships a feature, and it works. Month two, three more services want the same key, so they get it. A batch job starts running nightly. Someone tries the bigger model because the small one was a little dull, and it turns out the bigger model is fifteen times the price. Nobody notices, because nothing on the screen changes.
+
+Month three, the invoice arrives.
+
+And this is the part that always struck me: at that moment, nobody in the room can answer basic questions. Which team spent it. Which feature. Was it the nightly job or the demo someone left running over the weekend. The provider dashboard shows one number for one key, and that key belongs to everybody. So the meeting ends the way those meetings always end, with somebody saying we should be more careful, and nothing actually changing.
+
+The tools we reached for did not help either. They were all dashboards. They told you, beautifully and in colour, what you had already spent. But a dashboard is a rear view mirror. It cannot stop anything. By the time a chart goes red, the money is spent, and no chart has ever refunded a dollar.
+
+So the problem was never that we could not see the spending. It was that seeing was all we could do.
+
+## What I did about it
+
+I moved the decision to the moment it actually matters: before the request goes out.
+
+CostPilot sits between your app and the model providers and speaks the OpenAI API, so from your side it is a one line change to `base_url`. But every request that passes through gets asked a few questions first. Who are you. Are you allowed to use this model. Is there budget left. Can we answer this from a cache instead. Is there a cheaper model that still meets the bar you asked for.
+
+If the answer is no, the request never leaves the building. You get a `402` with a machine readable reason, not a surprise at the end of the month.
+
+And because a streaming answer can quietly run much longer than anyone estimated, the meter keeps running while the tokens come back. When the spend crosses the line mid answer, the stream is cut cleanly, with a proper `finish_reason` and a `[DONE]`, and only the tokens actually delivered get billed. The overshoot is bounded to a single chunk.
+
+None of this is worth much if it makes engineers hate you, so the whole governance decision has to disappear into the noise. It does: the budget check lands at 2.7 ms at the median under 100 requests per second.
+
+## One request, end to end
+
+Ten steps. Everything the request touches lights up as it goes.
+
+<p align="center">
+  <img src="docs/diagram.gif" alt="A live request moving through the CostPilot pipeline: auth, normalize, policy, cache, route, budget, forward, meter, ledger, settle" width="100%">
+</p>
+
+| | step | what it decides |
+|---|---|---|
+| 1 | **Auth** | who you are, from a hashed key, never from a header you sent |
+| 2 | **Normalize** | your OpenAI shaped request becomes one internal shape |
+| 3 | **Policy** | allow, deny, quietly downgrade, or hold for a human |
+| 4 | **Cache** | close enough to something already answered, serve it for free |
+| 5 | **Route** | cheapest model that still clears the bar you asked for |
+| 6 | **Budget** | reserve the worst case cost across every scope that governs you |
+| 7 | **Forward** | out to OpenAI, Anthropic, Gemini, or the built in mock |
+| 8 | **Meter** | count the money as it streams, cut off cleanly on breach |
+| 9 | **Ledger** | write the real charge, once, even if you hang up |
+| 10 | **Settle** | release, publish, and leave an audit row explaining the verdict |
+
+Money is stored as whole nanodollars, never floats, so nothing drifts. Postgres is the truth. Redis is a fast copy that can be rebuilt from the ledger at any time.
+
+## What it is not
+
+It is not a reliability gateway. There are no circuit breakers, no failover, no routing by latency or health. That is a different product and doing both badly helps nobody.
+
+There is exactly one deliberate reliability decision in here: if the budget store is unreachable, the request goes through. A billing system should never be the reason your product is down. That is a choice, it is written down, and it is tested.
+
+## Does it hold up
+
+Everything below comes out of one command, `bash loadtest/run.sh`, and the claims are read back from the Postgres ledger afterwards rather than from the load tool.
+
+| claim | target | measured |
+|---|---|---|
+| budget decision overhead at 100 req/s | single digit ms | **p50 2.72 ms** / p95 7.57 ms |
+| teams that overspent their cap under flood | 0 | **0 of 30** (156 served, 144 blocked) |
+| worst mid stream cutoff overshoot | one chunk | **about 1.5 tokens** |
+| clean cutoff signal and valid statuses | 100% | **100%** |
+
+Measured on a laptop running the whole stack and the load generator at once. Full method and caveats live in [BENCHMARK.md](BENCHMARK.md).
+
+## Try it
+
+Docker is the only thing you need, and the demo costs nothing because the default upstream is a mock provider that lives inside the app.
 
 ```bash
 git clone https://github.com/tanhoangkhoanguyen/CostPilot.git
 cd CostPilot
 docker compose up --build -d
-# wait for the gateway to report healthy (~2-3 min first time: image build + stack boot)
-docker compose ps gateway
 ```
 
-Seeded demo API keys (dev only - hashes live in the DB, these raw values are public on purpose):
+Then walk through the ten minute demo, the CLI, the Python SDK, and going live with real providers here:
 
-| key | scope |
-|-----|-------|
-| `cp_demo_team_platform` | team `platform` |
-| `cp_demo_team_research` | team `research` |
-| `cp_admin_root` | tenant admin (may impersonate teams via `X-Team-ID`) |
+### → [Setup and usage docs](docs/README.md)
 
-**1. A normal request flows through and gets billed** (mock upstream, $0):
+---
 
-```bash
-curl -s http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer cp_demo_team_platform" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hello"}],"max_tokens":64}'
-```
-
-**2. The headline: a streaming response gets cut off mid-generation the moment it would overspend.** Give team `research` a budget that passes the pre-flight estimate (which assumes a default-length answer) but cannot cover the long generation that actually happens - the exact under-estimate scenario mid-stream cutoff exists for:
-
-```bash
-# budget for team "research" (scope_ref matches the team name the gateway stamps on usage)
-docker compose exec postgres psql -U costpilot -d costpilot -c \
-  "insert into budget (scope_type, scope_ref, limit_amount) values ('team','research', 0.0013);"
-
-# the mock upstream echoes the prompt back token by token, so a ~2000-word prompt
-# forces a ~2000-token generation; no max_tokens -> the estimate assumes far less
-PROMPT=$(printf 'lorem %.0s' $(seq 1 2000))
-curl -sN http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer cp_demo_team_research" \
-  -H "Content-Type: application/json" \
-  -d "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROMPT\"}],\"stream\":true}" \
-  | tail -5
-```
-
-The stream delivers real chunks for a few seconds, then ends with a clean truncation event - `"finish_reason":"budget_cutoff"` followed by `[DONE]`, not a broken socket. Only the tokens actually delivered are billed (spend is bounded to within one streamed chunk of the budget).
-
-**3. Hard block, machine-readable.** Once the budget is exhausted, the next request is refused up front:
-
-```bash
-curl -si http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer cp_demo_team_research" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hello"}],"max_tokens":256}'
-# -> HTTP 402, {"error":{"type":"budget_exceeded","code":"team",...}}
-```
-
-**4. Watch it on the dashboard.** Open Grafana at <http://localhost:3000> (anonymous viewer enabled; admin/admin to edit) - the CostPilot governance dashboard shows requests, spend, and the budget rejections you just caused. Raw metrics: <http://localhost:9090> (Prometheus) or `curl localhost:8080/actuator/prometheus`.
-
-**5. Spend analytics** (ClickHouse-backed, reconciled against the Postgres ledger):
-
-```bash
-curl -s "http://localhost:8080/api/analytics/spend" -H "Authorization: Bearer cp_admin_root"
-curl -s "http://localhost:8080/api/analytics/reconcile" -H "Authorization: Bearer cp_admin_root"
-```
-
-## Semantic cache (optional cost optimization)
-
-An opt-in spend-reduction layer: when an incoming prompt is semantically close to one already answered, CostPilot serves the cached response at **\$0 provider cost** and records the would-be cost as savings. Off by default; enable with:
-
-```bash
-COSTPILOT_CACHE_ENABLED=true docker compose up -d
-```
-
-- **How it decides:** prompts are embedded by a deterministic local embedder (\$0, no network - dev and tests cost nothing) and stored in **pgvector**, keyed by tenant/team. A lookup takes the nearest neighbor **within the same tenant and team** - tenants can never hit each other's cache. The `Embedder` interface is the single swap point for a real embedding provider.
-- **Precision over recall:** a hit requires cosine similarity ≥ **0.97** (`COSTPILOT_CACHE_SIMILARITY_THRESHOLD`). The threshold is deliberately conservative so the false-hit rate stays low - the cache would rather forward a borderline prompt than serve a wrong answer. A hit sets `X-CostPilot-Cache: hit`.
-- **Savings:** every hit accrues `costpilot.cache.savings_nanos`; the Grafana dashboard shows cache savings, hit ratio, and hit/miss rate, and the figure reconciles against the hit log.
-
-Streaming requests bypass the cache (a cached answer is a complete response).
-
-## Going live with real providers
-
-Switching upstreams is env-only, never a code change. Quick OpenAI/Anthropic swap:
-
-```bash
-COSTPILOT_UPSTREAM_MODE=real \
-COSTPILOT_UPSTREAM_OPENAI_API_KEY=sk-... \
-COSTPILOT_UPSTREAM_ANTHROPIC_API_KEY=sk-ant-... \
-docker compose up -d
-```
-
-**Reproducible deploy profile (Gemini via Vertex AI).** For a repeatable real-provider bring-up with the credential injected at runtime (never baked into the image), use the `docker-compose.real.yml` overlay plus a `.env`:
-
-```bash
-cp .env.example .env                        # fill in project, pepper, credentials path
-cp /path/to/service-account.json secrets/adc.json && chmod 644 secrets/adc.json
-docker compose -f docker-compose.yml -f docker-compose.real.yml up --build -d
-```
-
-The overlay flips `COSTPILOT_UPSTREAM_MODE=real`, sets the Vertex `flavor`/`project`/`location`, mounts the service-account JSON **read-only** at `/var/secrets/adc.json` (ADC OAuth2 bearer auth), and overrides the dev pepper. The rest of the stack (Postgres, Redis, Kafka, ClickHouse, Prometheus, Grafana) is inherited unchanged, so health, the ledger, Redis counters, and `/actuator/prometheus` all populate against live traffic. `.env` and `secrets/*.json` are gitignored - no credential ever reaches git or the image.
-
-Point your OpenAI-compatible SDK at `http://localhost:8080/v1` with a CostPilot key as the bearer token. For any real deploy also override `COSTPILOT_API_KEY_PEPPER` and mint fresh keys via `POST /admin/keys`.
-
-## Admin CLI (`costpilot`)
-
-Finance/platform run the control plane without a frontend - set budgets and policy, and act on approvals - via the `costpilot` CLI (a standalone Picocli app that talks to the gateway's admin API). Build it, then point it at the gateway with an admin key:
-
-```bash
-./gradlew :cli:installDist
-export COSTPILOT_ENDPOINT=http://localhost:8080
-export COSTPILOT_ADMIN_KEY=cp_admin_root      # dev key; use a minted key in prod
-
-CLI=cli/build/install/costpilot/bin/costpilot
-
-# governance config - takes effect at runtime, no redeploy
-$CLI budget set --scope team --ref research --limit 25.00
-$CLI policy set --scope-type team --scope-ref research \
-      --allowed "gpt-4o-mini,claude-*" --fallback require_approval
-$CLI budget ls
-$CLI policy ls
-
-# human-in-the-loop approvals (Stage 8)
-$CLI approvals ls
-$CLI approvals approve <pending-id>
-$CLI approvals reject  <pending-id> --reason "over quarter budget"
-
-# spend (grouped by team | project | model)
-$CLI spend show --group-by team
-```
-
-Every command has `--help`, exits non-zero on error, and reads the endpoint + admin key from `--endpoint`/`--admin-key` flags or the `COSTPILOT_ENDPOINT`/`COSTPILOT_ADMIN_KEY` env vars.
-
-## Python SDK (`pip install costpilot`)
-
-App developers can call the gateway with a governance-first client instead of pointing a raw OpenAI SDK at it and parsing headers by hand. It surfaces the runtime verdict as typed data - cache hits, budget warnings, model routing/downgrades, mid-stream `budget_cutoff`, and typed exceptions (`BudgetExceededError.scope`, `PolicyDeniedError.rule_id`, `ApprovalRequiredError`). Sync + async, one dependency (`httpx`).
-
-```python
-from costpilot import CostPilot, BudgetExceededError
-
-cp = CostPilot(base_url="http://localhost:8080/v1", api_key="cp_...", team="research")
-r = cp.chat.completions.create(model="gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}])
-print(r.content, r.governance.cache_hit, r.governance.budget_warning)
-```
-
-Source, quickstart, and streaming/async examples: [`sdk/python/`](sdk/python/). Tests run against a mocked transport (`pytest`, no gateway, $0).
-
-## Load-test numbers (k6, reproducible)
-
-One command runs the whole benchmark - stack up, budgets seeded, three k6 scenarios, then the claims are verified straight from the Postgres ledger:
-
-```bash
-bash loadtest/run.sh
-```
-
-Scenarios: 130s warm soak at 30 req/s, then **100 req/s sustained for 30s** across 10 governed teams (guard latency), then **300 requests flooding 10 teams with tiny caps** (overspend), then **10 concurrent long streams** against cutoff-sized caps (cutoff accuracy).
-
-Measured on a dev laptop (Windows 11, Docker Desktop, whole stack + k6 on one machine):
-
-| claim | target | measured |
-|-------|--------|----------|
-| budget-guard decision overhead at 100 req/s | single-digit ms | p50 **2.72 ms** / p95 **7.57 ms** |
-| teams overspending their cap under flood | 0 | **0 of 30** (156 served, 144 blocked with 402) |
-| worst mid-stream cutoff overshoot | one streamed chunk | **~1.5 tokens** (mock) |
-| functional checks (clean cutoff signal, valid statuses) | 100% | **100%** |
-
-Guard quantiles are read from Prometheus at the measurement window, so micrometer's decaying summary can't dilute them with cold-start samples. The guard **p99 < 5 ms** target is pending a clean warm-host re-run (the last p99 was inflated by cold-build host contention). Full results, the live-Gemini run, and caveats: [BENCHMARK.md](BENCHMARK.md).
-
-## Development
-
-- Build + full test suite (Testcontainers - needs Docker): `./gradlew build`
-- 170+ tests against the embedded mock upstream; JaCoCo gate: line >= 80%, branch >= 60%
-- CI: GitHub Actions runs the same build on every push/PR
-- Roadmap and design decisions: [ROADMAP.md](ROADMAP.md)
+<div align="center">
+<sub>Built because a dashboard has never stopped a single dollar from leaving.</sub>
+</div>
