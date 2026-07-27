@@ -51,6 +51,37 @@ class StreamCostMeterTest {
 	}
 
 	@Test
+	void cjkOutputEstimateReflectsDenserTokenizationNotFlatCharsPerFour() {
+		// 6 Han ideographs. A flat chars/4 would estimate ceil(6/4)=2 tokens and the
+		// cutoff would lag ~3x; script weighting estimates ~1 token/char = 6.
+		StreamCostMeter meter = meter();
+		meter.observe(CanonicalStreamChunk.content("你好世界世界"));
+		assertThat(meter.usage().outputTokens()).isEqualTo(6);
+	}
+
+	@Test
+	void diacriticLatinAccruesFasterThanAsciiOfTheSameLength() {
+		StreamCostMeter ascii = meter();
+		ascii.observe(CanonicalStreamChunk.content("abcdefgh")); // 8 ASCII -> 2 tokens
+
+		StreamCostMeter toned = meter();
+		toned.observe(CanonicalStreamChunk.content("áàảãạ".repeat(2))); // 10 diacritic chars
+
+		assertThat(toned.usage().outputTokens())
+				.isGreaterThan(ascii.usage().outputTokens());
+	}
+
+	@Test
+	void providerReportedOutputSupersedesAHigherEstimate() {
+		// the length estimate can run ahead of the provider's real count; once the
+		// authoritative usage arrives it wins for the ledger, never Math.max (#89)
+		StreamCostMeter meter = meter();
+		meter.observe(CanonicalStreamChunk.content("你好世界世界")); // estimate = 6
+		meter.observe(CanonicalStreamChunk.usageOnly(new Usage(20, 3)));
+		assertThat(meter.usage().outputTokens()).isEqualTo(3);
+	}
+
+	@Test
 	void reportedUsageReconcilesInputAndOutput() {
 		StreamCostMeter meter = meter();
 		meter.observe(CanonicalStreamChunk.content("a "));
