@@ -3,8 +3,7 @@
 <style>
   :root{
     --ink:#0f172a; --slate:#5b6675; --mut:#94a3b8; --faint:#8b97a8;
-    --line2:#d3dae4; --wire:#94a3b8;
-    --accent:#f97316; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+    --line2:#d3dae4; --wire:#94a3b8; --accent:#f97316;
   }
   html,body{margin:0;}
   body{
@@ -13,49 +12,44 @@
     background-image:radial-gradient(#e6ebf2 1px, transparent 1px);
     background-size:26px 26px;
   }
-  .frame{max-width:1720px;margin:0 auto;}
+  .frame{max-width:1460px;margin:0 auto;}
   .scroll{overflow-x:auto;}
-  svg.arch{width:100%;height:auto;min-width:1400px;display:block;}
+  svg.arch{width:100%;height:auto;min-width:1180px;display:block;}
 
   svg.arch text{font-family:"Segoe UI",system-ui,sans-serif;}
-  .title{font-size:30px;font-weight:700;fill:var(--ink);}
-  .subtitle{font-size:14px;fill:var(--slate);}
-  .grp{font-size:11px;font-weight:700;fill:var(--mut);letter-spacing:1.8px;}
-  .hh{font-size:20px;font-weight:700;fill:var(--ink);}
-  .hs{font-size:12px;fill:var(--slate);}
-
-  .pt{font-size:10.5px;font-weight:700;fill:var(--mut);letter-spacing:1.4px;}
-  .sn{font-size:15px;font-weight:700;fill:var(--ink);}
-  .sp{font-size:10px;fill:var(--mut);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
-  .d{font-size:11.5px;fill:var(--slate);}
-  .dm{font-size:10.5px;fill:var(--faint);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
-  .ct{font-size:12.5px;font-weight:700;fill:var(--ink);}
-  .li{font-size:11px;fill:var(--slate);}
-  .lm{font-size:10.5px;fill:var(--slate);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
-  .nn{font-size:13px;font-weight:600;fill:var(--ink);}
-  .elbl{font-size:10.5px;fill:var(--mut);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
-  .bnum{font-size:10.5px;font-weight:700;fill:#64748b;}
-  .tag{font-size:9.5px;font-weight:700;letter-spacing:.6px;}
+  .title{font-size:29px;font-weight:700;fill:var(--ink);}
+  .subtitle{font-size:13.5px;fill:var(--slate);}
+  .grp{font-size:10.5px;font-weight:700;fill:var(--mut);letter-spacing:1.7px;}
+  .hh{font-size:19px;font-weight:700;fill:var(--ink);}
+  .hs{font-size:11.5px;fill:var(--slate);}
+  .nn{font-size:12.5px;font-weight:600;fill:var(--ink);}
+  .sl{font-size:12px;font-weight:700;fill:var(--ink);text-anchor:middle;}
+  .tg{font-size:9.5px;fill:var(--faint);text-anchor:middle;font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
+  .mono{font-size:10px;fill:var(--faint);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
+  .elbl{font-size:9.5px;fill:var(--mut);font-family:"Cascadia Code",ui-monospace,Consolas,monospace;}
+  .bnum{font-size:9.5px;font-weight:700;fill:#64748b;}
+  .pill{font-size:10px;font-weight:700;text-anchor:middle;}
 
   .cont{fill:rgba(255,255,255,.55);stroke:var(--line2);stroke-width:1.4;}
-  .pnl{fill:#ffffff;stroke:var(--line2);stroke-width:1.3;}
-  .card{fill:#ffffff;stroke:#e2e8f0;stroke-width:1.4;transition:stroke .25s, stroke-width .25s;}
-  .chip{fill:#fcfdff;stroke:#e6ebf2;stroke-width:1.2;}
+  .card{fill:#ffffff;stroke:#e2e8f0;stroke-width:1.4;transition:stroke .22s, stroke-width .22s;}
+  .chip{fill:#fcfdff;stroke:#e6ebf2;stroke-width:1.2;transition:stroke .22s, stroke-width .22s;}
   .lite{fill:#fbfcfe;stroke:#cbd5e1;stroke-width:1.3;stroke-dasharray:5 5;}
-  .badge{fill:#ffffff;stroke:#e2e8f0;stroke-width:1.2;transition:fill .25s, stroke .25s;}
-  .shape{fill:#ffffff;stroke:#dbe2ea;stroke-width:1.5;transition:stroke .25s,stroke-width .25s;}
+  .badge{fill:#ffffff;stroke:#e2e8f0;stroke-width:1.2;transition:fill .22s, stroke .22s;}
+  .shape{fill:#ffffff;stroke:#dbe2ea;stroke-width:1.5;transition:stroke .22s,stroke-width .22s;}
+  .ep{stroke-width:1.1;transition:stroke .22s, stroke-width .22s;}
 
   .wire{fill:none;stroke:var(--wire);stroke-width:1.5;stroke-linecap:round;}
-  .thin{fill:none;stroke:#c3cdd9;stroke-width:1.2;stroke-linecap:round;}
+  .thin{fill:none;stroke:#c9d3de;stroke-width:1.2;stroke-linecap:round;}
   .async{fill:none;stroke:var(--wire);stroke-width:1.4;stroke-linecap:round;stroke-dasharray:5 7;opacity:.7;}
-  .exit{fill:none;stroke:#cbd5e1;stroke-width:1.3;stroke-linecap:round;stroke-dasharray:4 4;}
   @media (prefers-reduced-motion: no-preference){ .async{animation:march 1.9s linear infinite;} }
   @keyframes march{to{stroke-dashoffset:-24;}}
 
   .stage.active .card{stroke:var(--accent);stroke-width:2.2;filter:url(#glow);}
   .stage.active .badge{fill:var(--accent);stroke:var(--accent);}
   .stage.active .bnum{fill:#fff;}
-  .node.pulse .shape,.node.pulse .chip{stroke:var(--accent);stroke-width:2.2;filter:url(#glow);}
+
+  /* anything downstream of the active step lights up with it */
+  .node.lit .shape,.node.lit .chip,.node.lit .ep{stroke:var(--accent);stroke-width:2.1;filter:url(#glow);}
 
   .pk{transform-box:fill-box;transform-origin:center;}
   @media (prefers-reduced-motion: no-preference){ .pk{animation:beat 1.8s ease-in-out infinite;} }
@@ -64,7 +58,7 @@
 
 <div class="frame">
   <div class="scroll">
-    <svg class="arch" viewBox="0 0 1720 1760" role="img" aria-label="CostPilot detailed system architecture">
+    <svg class="arch" viewBox="0 0 1460 770" role="img" aria-label="CostPilot system architecture">
       <defs>
         <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.07"/></filter>
         <filter id="card" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.5" stdDeviation="2.5" flood-color="#0f172a" flood-opacity="0.08"/></filter>
@@ -74,6 +68,7 @@
         <linearGradient id="gwbg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity=".92"/><stop offset="1" stop-color="#f4f7fb" stop-opacity=".8"/></linearGradient>
         <marker id="tip" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto"><path d="M1.8 2.2L7.2 5L1.8 7.8" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
         <marker id="tipl" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto"><path d="M1.8 2.2L7.2 5L1.8 7.8" fill="none" stroke="#c3cdd9" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></marker>
+        <marker id="tips" markerWidth="10" markerHeight="10" refX="7" refY="5" orient="auto-start-reverse"><path d="M1.8 2.2L7.2 5L1.8 7.8" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
 
         <symbol id="ic-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.3" fill="#16a34a"/><path d="M12 6.2v11.6M9.6 9.1c0-1.1 1-1.7 2.4-1.7s2.5.5 2.5 1.6c0 2.4-5 .9-5 3.4 0 1.1 1.1 1.7 2.5 1.7s2.4-.6 2.4-1.7" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 
@@ -112,495 +107,293 @@
         <symbol id="ic-out" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 8l4 4-4 4M14 12H3"/></g></symbol>
       </defs>
 
-      <!-- ============================ HEADER ============================ -->
-      <use href="#ic-coin" x="40" y="26" width="30" height="30"/>
-      <text x="82" y="50" class="title">CostPilot</text>
-      <text x="82" y="76" class="subtitle">AI-spending governance control plane · multi-provider LLM gateway that authorizes and meters every request at runtime</text>
+      <!-- ===================== HEADER ===================== -->
+      <use href="#ic-coin" x="36" y="24" width="28" height="28"/>
+      <text x="76" y="48" class="title">CostPilot</text>
+      <text x="76" y="72" class="subtitle">AI-spending governance control plane</text>
 
-      <line x1="40" y1="100" x2="1690" y2="100" stroke="#e6ebf2" stroke-width="1.2"/>
-      <line x1="40" y1="116" x2="70" y2="116" class="wire"/><text x="78" y="120" class="dm">governed request path</text>
-      <line x1="234" y1="116" x2="264" y2="116" class="async"/><text x="272" y="120" class="dm">async / off the hot path</text>
-      <line x1="440" y1="116" x2="470" y2="116" class="exit"/><text x="478" y="120" class="dm">early exit (never forwarded)</text>
-      <circle cx="672" cy="116" r="6" fill="url(#pg)"/><text x="686" y="120" class="dm">live request</text>
-      <text x="1690" y="120" text-anchor="end" class="dm">stage tags map to ROADMAP.md issues, e.g. (4.3) = stage 4, issue 3</text>
+      <line x1="36" y1="96" x2="1424" y2="96" stroke="#e6ebf2" stroke-width="1.2"/>
+      <line x1="36" y1="112" x2="62" y2="112" class="wire"/><text x="70" y="116" class="elbl">request</text>
+      <line x1="150" y1="112" x2="176" y2="112" class="async"/><text x="184" y="116" class="elbl">async</text>
+      <circle cx="250" cy="112" r="6" fill="url(#pg)"/><text x="262" y="116" class="elbl">live request</text>
+      <text x="1424" y="116" text-anchor="end" class="elbl">mock upstream by default · $0 dev</text>
 
-      <!-- column captions -->
-      <text x="168" y="164" text-anchor="middle" class="grp">EDGE · CLIENTS · EXITS</text>
-      <text x="730" y="164" text-anchor="middle" class="grp">GATEWAY · GOVERNED REQUEST PIPELINE</text>
-      <text x="1430" y="164" text-anchor="middle" class="grp">STATE · UPSTREAM</text>
+      <text x="111" y="140" text-anchor="middle" class="grp">CLIENTS</text>
+      <text x="734" y="140" text-anchor="middle" class="grp">GATEWAY · REQUEST PIPELINE</text>
+      <text x="1354" y="140" text-anchor="middle" class="grp">UPSTREAM</text>
 
-      <!-- ============================ WIRES ============================ -->
+      <!-- ===================== WIRES ===================== -->
       <g id="wires">
-        <!-- clients into pipeline -->
-        <path class="wire" marker-end="url(#tip)" d="M300 286 H338"/>
-        <!-- stage to stage -->
-        <path class="wire" marker-end="url(#tip)" d="M379 331 V347"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 437 V453"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 543 V559"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 649 V665"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 755 V771"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 861 V877"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 967 V983"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 1073 V1089"/>
-        <path class="wire" marker-end="url(#tip)" d="M379 1179 V1195"/>
+        <path class="wire" marker-end="url(#tip)" d="M186 245 H222"/>
+        <path class="wire" marker-end="url(#tip)" d="M320 245 H332"/>
+        <path class="wire" marker-end="url(#tip)" d="M422 245 H434"/>
+        <path class="wire" marker-end="url(#tip)" d="M524 245 H536"/>
+        <path class="wire" marker-end="url(#tip)" d="M626 245 H638"/>
+        <path class="wire" marker-end="url(#tip)" d="M728 245 H740"/>
+        <path class="wire" marker-end="url(#tip)" d="M830 245 H842"/>
+        <path class="wire" marker-end="url(#tip)" d="M932 245 H944"/>
+        <path class="wire" marker-end="url(#tip)" d="M1034 245 H1046"/>
+        <path class="wire" marker-end="url(#tip)" d="M1136 245 H1148"/>
+        <path class="wire" marker-start="url(#tips)" marker-end="url(#tip)" d="M898 196 C1000 166 1180 162 1282 186"/>
 
-        <!-- stage -> right lane dependencies -->
-        <path class="thin" marker-end="url(#tipl)" d="M1114 286 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 392 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 498 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 604 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 710 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 816 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 922 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 1028 C1140 1028 1146 1010 1168 1000"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 1134 H1168"/>
-        <path class="thin" marker-end="url(#tipl)" d="M1114 1240 H1168"/>
+        <!-- step -> state -->
+        <path class="thin" marker-end="url(#tipl)" d="M274 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M478 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M580 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M682 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M784 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M1090 294 V398"/>
+        <path class="thin" marker-end="url(#tipl)" d="M1192 294 V398"/>
 
-        <!-- early exits back to the left lane -->
-        <path class="exit" marker-end="url(#tipl)" d="M346 512 C300 512 268 560 264 700"/>
-        <path class="exit" marker-end="url(#tipl)" d="M346 498 C280 498 250 560 250 736"/>
-        <path class="exit" marker-end="url(#tipl)" d="M346 830 C300 830 236 800 236 772"/>
-        <path class="exit" marker-end="url(#tipl)" d="M346 604 C300 604 222 640 222 808"/>
+        <!-- state -> stores -->
+        <path class="thin" marker-end="url(#tipl)" d="M274 452 C274 476 380 470 420 486"/>
+        <path class="thin" marker-end="url(#tipl)" d="M1192 452 C1192 480 780 486 700 490"/>
+        <path class="thin" marker-end="url(#tipl)" d="M784 452 C784 472 900 474 950 486"/>
 
-        <!-- settle -> analytics / observability -->
-        <path class="async" marker-end="url(#tipl)" d="M700 1284 C700 1330 780 1348 830 1374"/>
-        <path class="async" marker-end="url(#tipl)" d="M900 1284 C1100 1320 1300 1330 1380 1374"/>
-        <!-- ledger -> postgres -->
-        <path class="wire" marker-end="url(#tip)" d="M470 1284 C470 1330 340 1340 260 1374"/>
-
-        <!-- admin plane -> gateway (runtime config, no redeploy) -->
-        <path class="async" marker-end="url(#tipl)" d="M300 960 C324 960 332 900 340 866"/>
+        <!-- settle -> async -->
+        <path class="async" marker-end="url(#tipl)" d="M1198 300 C1250 350 1260 500 320 570"/>
+        <path class="async" marker-end="url(#tipl)" d="M1206 302 C1268 400 1010 540 812 570"/>
       </g>
 
-      <!-- ============================ LEFT LANE ============================ -->
+      <!-- ===================== CLIENTS ===================== -->
+      <rect x="36" y="150" width="150" height="200" rx="14" class="cont" filter="url(#soft)"/>
+      <rect class="shape" x="48" y="172" width="126" height="56" rx="11" filter="url(#card)"/>
+      <use href="#ic-app" x="62" y="186" width="20" height="20" style="color:#6366f1"/>
+      <text x="92" y="196" class="nn">Apps</text>
+      <text x="92" y="212" class="mono">OpenAI SDK</text>
+      <rect class="shape" x="48" y="240" width="126" height="56" rx="11" filter="url(#card)"/>
+      <use href="#ic-cli" x="62" y="254" width="20" height="20" style="color:#8b5cf6"/>
+      <text x="92" y="264" class="nn">CLI</text>
+      <text x="92" y="280" class="mono">Picocli</text>
+      <text x="111" y="322" text-anchor="middle" class="elbl">POST /v1/chat/completions</text>
 
-      <!-- clients -->
-      <rect x="36" y="184" width="264" height="188" rx="14" class="pnl" filter="url(#soft)"/>
-      <text x="52" y="206" class="pt">CLIENTS</text>
-      <use href="#ic-app" x="52" y="216" width="20" height="20" style="color:#6366f1"/>
-      <text x="80" y="226" class="ct">Applications</text>
-      <text x="80" y="242" class="dm">openai-python · openai-node</text>
-      <text x="80" y="256" class="dm">base_url -&gt; CostPilot</text>
-      <use href="#ic-cli" x="52" y="272" width="20" height="20" style="color:#8b5cf6"/>
-      <text x="80" y="282" class="ct">costpilot CLI</text>
-      <text x="80" y="298" class="dm">cli/ Picocli · HTTP only</text>
-      <use href="#ic-out" x="52" y="316" width="20" height="20" style="color:#0ea5e9"/>
-      <text x="80" y="326" class="ct">POST /v1/chat/completions</text>
-      <text x="80" y="342" class="dm">JSON or text/event-stream</text>
-      <text x="80" y="356" class="dm">stream=true -&gt; SseEmitter</text>
+      <!-- ===================== GATEWAY ===================== -->
+      <rect x="214" y="150" width="1040" height="200" rx="16" fill="url(#gwbg)" stroke="var(--line2)" stroke-width="1.4" filter="url(#soft)"/>
+      <use href="#ic-coin" x="230" y="164" width="20" height="20"/>
+      <text x="258" y="176" class="hh">CostPilot Gateway</text>
+      <use href="#ic-spring" x="258" y="185" width="11" height="11"/>
+      <text x="274" y="194" class="hs">Spring Boot MVC · virtual threads</text>
 
-      <!-- request envelope -->
-      <rect x="36" y="392" width="264" height="204" rx="14" class="pnl" filter="url(#soft)"/>
-      <text x="52" y="414" class="pt">REQUEST ENVELOPE</text>
-      <text x="52" y="436" class="lm">Authorization: Bearer cp_…</text>
-      <text x="52" y="454" class="li">identity, never trusted headers (6.1)</text>
-      <text x="52" y="476" class="lm">X-Team-ID / X-Project-ID</text>
-      <text x="52" y="494" class="li">honoured only for cp_admin_* keys</text>
-      <text x="52" y="516" class="lm">X-User-ID · X-Environment</text>
-      <text x="52" y="534" class="li">attribution only, no authority</text>
-      <text x="52" y="556" class="lm">Idempotency-Key</text>
-      <text x="52" y="574" class="li">replay-safe ledger write (2.2)</text>
-      <text x="52" y="590" class="lm">X-CostPilot-Min-Tier: 2</text>
+      <g class="stage" id="st-0">
+        <rect class="card" x="228" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="308" cy="208" r="9"/><text x="308" y="211" text-anchor="middle" class="bnum">1</text>
+        <use href="#ic-lock" x="262" y="218" width="24" height="24" style="color:#6366f1"/>
+        <text x="274" y="266" class="sl">Auth</text>
+        <text x="274" y="282" class="tg">key hash</text>
+      </g>
+      <g class="stage" id="st-1">
+        <rect class="card" x="330" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="410" cy="208" r="9"/><text x="410" y="211" text-anchor="middle" class="bnum">2</text>
+        <use href="#ic-swap" x="364" y="218" width="24" height="24" style="color:#0891b2"/>
+        <text x="376" y="266" class="sl">Normalize</text>
+        <text x="376" y="282" class="tg">canonical</text>
+      </g>
+      <g class="stage" id="st-2">
+        <rect class="card" x="432" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="512" cy="208" r="9"/><text x="512" y="211" text-anchor="middle" class="bnum">3</text>
+        <use href="#ic-policy" x="466" y="218" width="24" height="24" style="color:#d97706"/>
+        <text x="478" y="266" class="sl">Policy</text>
+        <text x="478" y="282" class="tg">4 verdicts</text>
+      </g>
+      <g class="stage" id="st-3">
+        <rect class="card" x="534" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="614" cy="208" r="9"/><text x="614" y="211" text-anchor="middle" class="bnum">4</text>
+        <use href="#ic-cache" x="568" y="218" width="24" height="24" style="color:#14b8a6"/>
+        <text x="580" y="266" class="sl">Cache</text>
+        <text x="580" y="282" class="tg">≥0.97 → $0</text>
+      </g>
+      <g class="stage" id="st-4">
+        <rect class="card" x="636" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="716" cy="208" r="9"/><text x="716" y="211" text-anchor="middle" class="bnum">5</text>
+        <use href="#ic-route" x="670" y="218" width="24" height="24" style="color:#2563eb"/>
+        <text x="682" y="266" class="sl">Route</text>
+        <text x="682" y="282" class="tg">min-tier</text>
+      </g>
+      <g class="stage" id="st-5">
+        <rect class="card" x="738" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="818" cy="208" r="9"/><text x="818" y="211" text-anchor="middle" class="bnum">6</text>
+        <use href="#ic-gauge" x="772" y="218" width="24" height="24" style="color:#16a34a"/>
+        <text x="784" y="266" class="sl">Budget</text>
+        <text x="784" y="282" class="tg">4 scopes</text>
+      </g>
+      <g class="stage" id="st-6">
+        <rect class="card" x="840" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="920" cy="208" r="9"/><text x="920" y="211" text-anchor="middle" class="bnum">7</text>
+        <use href="#ic-fwd" x="874" y="218" width="24" height="24" style="color:#4f46e5"/>
+        <text x="886" y="266" class="sl">Forward</text>
+        <text x="886" y="282" class="tg">adapter</text>
+      </g>
+      <g class="stage" id="st-7">
+        <rect class="card" x="942" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="1022" cy="208" r="9"/><text x="1022" y="211" text-anchor="middle" class="bnum">8</text>
+        <use href="#ic-cut" x="976" y="218" width="24" height="24" style="color:#dc2626"/>
+        <text x="988" y="266" class="sl">Meter</text>
+        <text x="988" y="282" class="tg">cutoff</text>
+      </g>
+      <g class="stage" id="st-8">
+        <rect class="card" x="1044" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="1124" cy="208" r="9"/><text x="1124" y="211" text-anchor="middle" class="bnum">9</text>
+        <use href="#ic-ledger" x="1078" y="218" width="24" height="24" style="color:#7c3aed"/>
+        <text x="1090" y="266" class="sl">Ledger</text>
+        <text x="1090" y="282" class="tg">idempotent</text>
+      </g>
+      <g class="stage" id="st-9">
+        <rect class="card" x="1146" y="196" width="92" height="98" rx="12" filter="url(#card)"/>
+        <circle class="badge" cx="1226" cy="208" r="9"/><text x="1226" y="211" text-anchor="middle" class="bnum">10</text>
+        <use href="#ic-settle" x="1180" y="218" width="24" height="24" style="color:#0d9488"/>
+        <text x="1192" y="266" class="sl">Settle</text>
+        <text x="1192" y="282" class="tg">emit + audit</text>
+      </g>
 
       <!-- exits -->
-      <rect x="36" y="616" width="264" height="256" rx="14" class="pnl" filter="url(#soft)"/>
-      <text x="52" y="638" class="pt">TERMINAL OUTCOMES</text>
-
-      <rect x="52" y="650" width="232" height="46" rx="9" class="chip"/>
-      <text x="64" y="668" class="ct" fill="#16a34a">200 OK</text>
-      <text x="64" y="686" class="dm">chat.completion · or SSE + [DONE]</text>
-
-      <rect x="52" y="704" width="232" height="46" rx="9" class="chip"/>
-      <text x="64" y="722" class="ct" fill="#dc2626">403 policy_denied</text>
-      <text x="64" y="740" class="dm">audited before it throws</text>
-
-      <rect x="52" y="758" width="232" height="46" rx="9" class="chip"/>
-      <text x="64" y="776" class="ct" fill="#dc2626">402 budget_exceeded</text>
-      <text x="64" y="794" class="dm">only when nothing cheaper fits</text>
-
-      <rect x="52" y="812" width="232" height="46" rx="9" class="chip"/>
-      <text x="64" y="830" class="ct" fill="#d97706">202 approval.pending</text>
-      <text x="64" y="848" class="dm">{ id, state, expires_at }</text>
-
-      <!-- response headers -->
-      <rect x="36" y="892" width="264" height="200" rx="14" class="pnl" filter="url(#soft)"/>
-      <text x="52" y="914" class="pt">ADMIN / CONTROL PLANE</text>
-      <use href="#ic-admin" x="52" y="924" width="18" height="18" style="color:#7c3aed"/>
-      <text x="78" y="938" class="li">runtime config, zero redeploy</text>
-      <text x="52" y="960" class="lm">/admin/budgets · /admin/policies</text>
-      <text x="52" y="978" class="lm">/admin/keys · /admin/approvals</text>
-      <text x="52" y="996" class="lm">/admin/audit</text>
-      <text x="52" y="1016" class="li">secured by cp_admin_* keys only</text>
-      <text x="52" y="1034" class="li">writes invalidate the Redis policy</text>
-      <text x="52" y="1050" class="li">and budget caches immediately</text>
-      <text x="52" y="1072" class="lm" fill="#7c3aed">AdminAuditService -&gt; admin_audit</text>
-
-      <!-- approval lifecycle -->
-      <rect x="36" y="1112" width="264" height="198" rx="14" class="pnl" filter="url(#soft)"/>
-      <text x="52" y="1134" class="pt">APPROVAL LIFECYCLE (STAGE 8)</text>
-      <use href="#ic-clock" x="52" y="1144" width="18" height="18" style="color:#d97706"/>
-      <text x="78" y="1158" class="lm">pending_approval.state</text>
-      <text x="52" y="1182" class="li"><tspan class="lm" fill="#d97706">pending</tspan> -&gt; <tspan class="lm" fill="#16a34a">approved</tspan> -&gt; resume once</text>
-      <text x="52" y="1200" class="li">replays GovernedRequestExecutor, so</text>
-      <text x="52" y="1216" class="li">it runs identical governance, once</text>
-      <text x="52" y="1236" class="li"><tspan class="lm" fill="#dc2626">rejected</tspan> · <tspan class="lm" fill="#94a3b8">expired</tspan> by the sweeper</text>
-      <text x="52" y="1254" class="li">(@Scheduled, needs no live request)</text>
-      <text x="52" y="1276" class="dm">RequestPayloadCodec persists the</text>
-      <text x="52" y="1290" class="dm">payload · resume is non-streaming</text>
-
-      <!-- ============================ GATEWAY ============================ -->
-      <rect x="320" y="184" width="820" height="1126" rx="18" fill="url(#gwbg)" stroke="var(--line2)" stroke-width="1.4" filter="url(#soft)"/>
-      <use href="#ic-coin" x="340" y="200" width="24" height="24"/>
-      <text x="372" y="214" class="hh">CostPilot Gateway</text>
-      <use href="#ic-spring" x="372" y="223" width="12" height="12"/>
-      <text x="389" y="232" class="hs">Spring Boot MVC · virtual threads · WebClient only for upstream SSE · api/ChatCompletionsController orchestrates all of it</text>
-
-      <!-- stage 1 AUTH -->
-      <g class="stage" id="st-0">
-        <rect class="card" x="346" y="244" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="264" r="11"/><text x="1094" y="268" text-anchor="middle" class="bnum">1</text>
-        <use href="#ic-lock" x="366" y="273" width="26" height="26" style="color:#6366f1"/>
-        <text x="410" y="272" class="sn">Authenticate</text>
-        <text x="410" y="290" class="sp">security/ApiKeyAuthFilter (6.1)</text>
-        <text x="410" y="310" class="dm">SecurityConfig · CurrentPrincipal</text>
-        <text x="672" y="270" class="d">HMAC-SHA256(key, server pepper) -&gt; api_key.key_hash lookup</text>
-        <text x="672" y="288" class="d">yields AuthenticatedPrincipal { tenant, team, project, admin }</text>
-        <text x="672" y="306" class="d">team keys are force-pinned to their team; admin keys may</text>
-        <text x="672" y="322" class="d">impersonate via X-Team-ID. This is the per-team isolation.</text>
+      <path class="thin" d="M478 294 V310"/>
+      <g class="node" id="ex-policy">
+        <rect class="ep" x="440" y="310" width="76" height="22" rx="11" fill="#fef2f2" stroke="#fecaca"/>
       </g>
+      <text x="478" y="325" class="pill" fill="#dc2626">403 · 202</text>
 
-      <!-- stage 2 NORMALIZE -->
-      <g class="stage" id="st-1">
-        <rect class="card" x="346" y="350" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="370" r="11"/><text x="1094" y="374" text-anchor="middle" class="bnum">2</text>
-        <use href="#ic-swap" x="366" y="379" width="26" height="26" style="color:#0891b2"/>
-        <text x="410" y="378" class="sn">Normalize</text>
-        <text x="410" y="396" class="sp">core/model/CanonicalChatRequest</text>
-        <text x="410" y="416" class="dm">api/RequestContext · LedgerContext</text>
-        <text x="672" y="376" class="d">OpenAI-shaped ChatCompletionRequest -&gt; CanonicalChatRequest.</text>
-        <text x="672" y="394" class="d">Everything internal speaks canonical; only the edges speak</text>
-        <text x="672" y="412" class="d">provider dialects. LedgerContext carries tenant/team/project/</text>
-        <text x="672" y="428" class="d">user/env plus the Idempotency-Key (generated if absent).</text>
+      <path class="thin" d="M784 294 V310"/>
+      <g class="node" id="ex-budget">
+        <rect class="ep" x="756" y="310" width="56" height="22" rx="11" fill="#fef2f2" stroke="#fecaca"/>
       </g>
+      <text x="784" y="325" class="pill" fill="#dc2626">402</text>
 
-      <!-- stage 3 POLICY -->
-      <g class="stage" id="st-2">
-        <rect class="card" x="346" y="456" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="476" r="11"/><text x="1094" y="480" text-anchor="middle" class="bnum">3</text>
-        <use href="#ic-policy" x="366" y="485" width="26" height="26" style="color:#d97706"/>
-        <text x="410" y="484" class="sn">Policy</text>
-        <text x="410" y="502" class="sp">policy/PolicyService (3.3)</text>
-        <text x="410" y="522" class="dm">who may spend, on which model</text>
-        <text x="672" y="478" class="d"><tspan class="lm" fill="#16a34a">ALLOW</tspan>  ·  <tspan class="lm" fill="#dc2626">DENY</tspan> -&gt; audit then 403  ·  <tspan class="lm" fill="#0891b2">DOWNGRADE</tspan> swaps the</text>
-        <text x="672" y="496" class="d">executed model before budget  ·  <tspan class="lm" fill="#d97706">REQUIRE_APPROVAL</tspan> parks it</text>
-        <text x="672" y="514" class="d">8.1 cost gate: an otherwise-ALLOW request whose pre-flight MAX</text>
-        <text x="672" y="530" class="d">estimate clears approvalThresholdNanos is parked too.</text>
+      <path class="thin" d="M988 294 V310"/>
+      <g class="node" id="ex-meter">
+        <rect class="ep" x="942" y="310" width="92" height="22" rx="11" fill="#fffbeb" stroke="#fde68a"/>
       </g>
+      <text x="988" y="325" class="pill" fill="#b45309">budget_cutoff</text>
 
-      <!-- stage 4 CACHE -->
-      <g class="stage" id="st-3">
-        <rect class="card" x="346" y="562" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="582" r="11"/><text x="1094" y="586" text-anchor="middle" class="bnum">4</text>
-        <use href="#ic-cache" x="366" y="591" width="26" height="26" style="color:#14b8a6"/>
-        <text x="410" y="590" class="sn">Semantic cache</text>
-        <text x="410" y="608" class="sp">cache/SemanticCacheService (10.2)</text>
-        <text x="410" y="628" class="dm">opt-in · COSTPILOT_CACHE_ENABLED</text>
-        <text x="672" y="584" class="d">Embedder -&gt; pgvector nearest neighbour scoped to the same</text>
-        <text x="672" y="602" class="d">tenant + team: similarity = 1 - (embedding &lt;=&gt; q) ≥ 0.97.</text>
-        <text x="672" y="620" class="d">A hit serves the stored response at $0 provider cost, sets</text>
-        <text x="672" y="636" class="d">X-CostPilot-Cache: hit, books the would-be cost as savings.</text>
+      <path class="thin" d="M1192 294 V310"/>
+      <g class="node" id="ex-ok">
+        <rect class="ep" x="1156" y="310" width="72" height="22" rx="11" fill="#f0fdf4" stroke="#bbf7d0"/>
       </g>
+      <text x="1192" y="325" class="pill" fill="#16a34a">200 OK</text>
 
-      <!-- stage 5 ROUTE -->
-      <g class="stage" id="st-4">
-        <rect class="card" x="346" y="668" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="688" r="11"/><text x="1094" y="692" text-anchor="middle" class="bnum">5</text>
-        <use href="#ic-route" x="366" y="697" width="26" height="26" style="color:#2563eb"/>
-        <text x="410" y="696" class="sn">Cost routing</text>
-        <text x="410" y="714" class="sp">routing/RoutingService (7.2)</text>
-        <text x="410" y="734" class="dm">CostComparisonService · price, never health</text>
-        <text x="672" y="690" class="d">Runs only when the client declared X-CostPilot-Min-Tier and</text>
-        <text x="672" y="708" class="d">the policy verdict is a plain ALLOW - an explicit DOWNGRADE wins.</text>
-        <text x="672" y="726" class="d">Picks the cheapest policy-allowed model at or above the tier and</text>
-        <text x="672" y="742" class="d">reports it via X-CostPilot-Model-Routed: original -&gt; executed.</text>
-      </g>
+      <!-- ===================== UPSTREAM ===================== -->
+      <rect x="1284" y="150" width="140" height="200" rx="14" class="cont" filter="url(#soft)"/>
+      <g class="node" id="pv-openai"><rect class="shape" x="1294" y="166" width="120" height="38" rx="10" filter="url(#card)"/></g>
+      <use href="#ic-openai" x="1304" y="176" width="18" height="18"/>
+      <text x="1330" y="190" class="nn">OpenAI</text>
+      <g class="node" id="pv-anthropic"><rect class="shape" x="1294" y="212" width="120" height="38" rx="10" filter="url(#card)"/></g>
+      <use href="#ic-anthropic" x="1304" y="222" width="18" height="18"/>
+      <text x="1330" y="236" class="nn">Anthropic</text>
+      <g class="node" id="pv-gemini"><rect class="shape" x="1294" y="258" width="120" height="38" rx="10" filter="url(#card)"/></g>
+      <use href="#ic-gemini" x="1304" y="268" width="18" height="18"/>
+      <text x="1330" y="282" class="nn">Gemini</text>
+      <rect x="1294" y="304" width="120" height="38" rx="10" class="lite"/>
+      <use href="#ic-mock" x="1304" y="314" width="18" height="18" style="color:#94a3b8"/>
+      <text x="1330" y="328" class="nn" fill="#64748b">Mock</text>
 
-      <!-- stage 6 BUDGET -->
-      <g class="stage" id="st-5">
-        <rect class="card" x="346" y="774" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="794" r="11"/><text x="1094" y="798" text-anchor="middle" class="bnum">6</text>
-        <use href="#ic-gauge" x="366" y="803" width="26" height="26" style="color:#16a34a"/>
-        <text x="410" y="802" class="sn">Budget reserve</text>
-        <text x="410" y="820" class="sp">budget/BudgetGuard.reserve (3.2)</text>
-        <text x="410" y="840" class="dm">hot path, target &lt; 5 ms · fail-open</text>
-        <text x="672" y="796" class="d">Atomically reserves the request's estimated MAX cost against</text>
-        <text x="672" y="814" class="d">every governed scope: <tspan class="lm">TENANT · TEAM · PROJECT · MODEL</tspan>.</text>
-        <text x="672" y="832" class="d">Hard block -&gt; DowngradeService retries up to 3 cheaper allowed</text>
-        <text x="672" y="848" class="d">models (4.1); only if none fits does the 402 escape. Soft ≤20%</text>
-      </g>
+      <!-- ===================== STATE ===================== -->
+      <text x="36" y="386" class="grp">STATE</text>
 
-      <!-- stage 7 FORWARD -->
-      <g class="stage" id="st-6">
-        <rect class="card" x="346" y="880" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="900" r="11"/><text x="1094" y="904" text-anchor="middle" class="bnum">7</text>
-        <use href="#ic-fwd" x="366" y="909" width="26" height="26" style="color:#4f46e5"/>
-        <text x="410" y="908" class="sn">Forward</text>
-        <text x="410" y="926" class="sp">upstream/ForwardingService</text>
-        <text x="410" y="946" class="dm">provider/ProviderRegistry</text>
-        <text x="672" y="902" class="d">Registry resolves the adapter by explicit config first</text>
-        <text x="672" y="920" class="d">(costpilot.upstream.model-providers), else model-id prefix.</text>
-        <text x="672" y="938" class="d">Non-streaming returns Mono&lt;CanonicalChatResponse&gt;; streaming</text>
-        <text x="672" y="954" class="d">returns Flux&lt;CanonicalStreamChunk&gt; relayed via SseEmitter.</text>
-      </g>
+      <g class="node" id="tb-apikey"><rect class="chip" x="228" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="266" y="408" width="16" height="16"/>
+      <text x="274" y="440" class="tg" fill="#5b6675">api_key</text>
 
-      <!-- stage 8 METER -->
-      <g class="stage" id="st-7">
-        <rect class="card" x="346" y="986" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="1006" r="11"/><text x="1094" y="1010" text-anchor="middle" class="bnum">8</text>
-        <use href="#ic-cut" x="366" y="1015" width="26" height="26" style="color:#dc2626"/>
-        <text x="410" y="1014" class="sn">Meter + cutoff</text>
-        <text x="410" y="1032" class="sp">cost/StreamCostMeter (4.2 / 4.3)</text>
-        <text x="410" y="1052" class="dm">streaming only</text>
-        <text x="672" y="1008" class="d">Accrues cost per SSE chunk. Allowance = this request's own</text>
-        <text x="672" y="1026" class="d">reservation + what remained in the tightest governed scope.</text>
-        <text x="672" y="1044" class="d">On crossing, takeUntil emits the crossing chunk then cancels</text>
-        <text x="672" y="1060" class="d">upstream, appending finish_reason=budget_cutoff + [DONE].</text>
-      </g>
+      <g class="node" id="tb-policy"><rect class="chip" x="432" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="470" y="408" width="16" height="16"/>
+      <text x="478" y="440" class="tg" fill="#5b6675">policy_rule</text>
 
-      <!-- stage 9 LEDGER -->
-      <g class="stage" id="st-8">
-        <rect class="card" x="346" y="1092" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="1112" r="11"/><text x="1094" y="1116" text-anchor="middle" class="bnum">9</text>
-        <use href="#ic-ledger" x="366" y="1121" width="26" height="26" style="color:#7c3aed"/>
-        <text x="410" y="1120" class="sn">Ledger</text>
-        <text x="410" y="1138" class="sp">cost/UsageLedgerService (2.2)</text>
-        <text x="410" y="1158" class="dm">CostCalculator · PriceVersioningService</text>
-        <text x="672" y="1114" class="d">Transactional, idempotent write keyed by Idempotency-Key.</text>
-        <text x="672" y="1132" class="d">For streams it runs in doFinally, so tokens are still billed</text>
-        <text x="672" y="1150" class="d">when the client disconnects mid-stream. Always charges the</text>
-        <text x="672" y="1166" class="d">exact effective-dated price in integer nanodollars (scale 9).</text>
-      </g>
+      <g class="node" id="tb-cache"><rect class="chip" x="534" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="572" y="408" width="16" height="16"/>
+      <text x="580" y="440" class="tg" fill="#5b6675">prompt_cache</text>
 
-      <!-- stage 10 SETTLE -->
-      <g class="stage" id="st-9">
-        <rect class="card" x="346" y="1198" width="768" height="84" rx="13" filter="url(#card)"/>
-        <circle class="badge" cx="1094" cy="1218" r="11"/><text x="1094" y="1222" text-anchor="middle" class="bnum">10</text>
-        <use href="#ic-settle" x="366" y="1227" width="26" height="26" style="color:#0d9488"/>
-        <text x="410" y="1226" class="sn">Settle</text>
-        <text x="410" y="1244" class="sp">release · emit · audit (5.1)</text>
-        <text x="410" y="1264" class="dm">AuditService · GovernanceMetrics</text>
-        <text x="672" y="1220" class="d">BudgetGuard.release() gives the reservation back - the ledger</text>
-        <text x="672" y="1238" class="d">charge is the real deduction, so release is never a refund.</text>
-        <text x="672" y="1256" class="d">UsageEventPublisher -&gt; Kafka; the decision (original vs executed</text>
-        <text x="672" y="1272" class="d">model, reason, blocked scope) is written to audit_record.</text>
-      </g>
+      <g class="node" id="tb-price"><rect class="chip" x="636" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="674" y="408" width="16" height="16"/>
+      <text x="682" y="440" class="tg" fill="#5b6675">model_price</text>
 
-      <!-- ============================ RIGHT LANE ============================ -->
+      <g class="node" id="tb-budget"><rect class="chip" x="738" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-redis" x="776" y="408" width="16" height="16"/>
+      <text x="784" y="440" class="tg" fill="#5b6675">budget:*</text>
 
-      <g class="node" id="dep-apikey">
-        <rect class="chip" x="1168" y="248" width="516" height="76" rx="11"/>
-      </g>
-      <use href="#ic-postgres" x="1184" y="264" width="20" height="20"/>
-      <text x="1212" y="270" class="ct">api_key · tenant · team · project</text>
-      <text x="1212" y="288" class="li">key_hash (never plaintext), scope flags, revocation</text>
-      <text x="1212" y="306" class="dm">pepper is a server secret, not in the DB - a table dump alone is useless</text>
+      <g class="node" id="tb-usage"><rect class="chip" x="1044" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="1082" y="408" width="16" height="16"/>
+      <text x="1090" y="440" class="tg" fill="#5b6675">usage_record</text>
 
-      <rect class="chip" x="1168" y="354" width="516" height="76" rx="11"/>
-      <use href="#ic-swap" x="1184" y="370" width="20" height="20" style="color:#0891b2"/>
-      <text x="1212" y="376" class="ct">core/model - the internal contract</text>
-      <text x="1212" y="394" class="dm">CanonicalChatRequest · CanonicalChatResponse</text>
-      <text x="1212" y="412" class="dm">CanonicalStreamChunk · Usage · UsageEvent</text>
+      <g class="node" id="tb-audit"><rect class="chip" x="1146" y="398" width="92" height="54" rx="11"/></g>
+      <use href="#ic-postgres" x="1184" y="408" width="16" height="16"/>
+      <text x="1192" y="440" class="tg" fill="#5b6675">audit_record</text>
 
-      <rect class="chip" x="1168" y="460" width="516" height="76" rx="11"/>
-      <use href="#ic-postgres" x="1184" y="476" width="20" height="20"/>
-      <text x="1212" y="482" class="ct">policy_rule</text>
-      <text x="1212" y="500" class="li">tenant / team scope, model set, action, matched_rule_id</text>
-      <text x="1212" y="518" class="dm">approval_threshold_nanos · cached in Redis, invalidated on admin write</text>
+      <!-- stores -->
+      <g class="node" id="db-postgres"><rect class="shape" x="228" y="486" width="560" height="58" rx="13" filter="url(#card)"/></g>
+      <use href="#ic-postgres" x="248" y="501" width="26" height="26"/>
+      <text x="286" y="510" class="nn">PostgreSQL + pgvector</text>
+      <text x="286" y="527" class="mono">source of truth · 13 tables · Flyway</text>
 
-      <g class="node" id="dep-cache">
-        <rect class="chip" x="1168" y="566" width="516" height="76" rx="11"/>
-      </g>
-      <use href="#ic-postgres" x="1184" y="582" width="20" height="20"/>
-      <text x="1212" y="588" class="ct">prompt_cache  <tspan class="dm">(pgvector)</tspan></text>
-      <text x="1212" y="606" class="li">embedding vector, response payload, cost_nanos, tenant + team</text>
-      <text x="1212" y="624" class="dm">V13__prompt_cache.sql · MockEmbedder keeps dev deterministic and free</text>
+      <g class="node" id="db-redis"><rect class="shape" x="812" y="486" width="442" height="58" rx="13" filter="url(#card)"/></g>
+      <use href="#ic-redis" x="832" y="501" width="26" height="26"/>
+      <text x="870" y="510" class="nn">Redis</text>
+      <text x="870" y="527" class="mono">fast mirror · integer nanodollars · rebuildable</text>
 
-      <rect class="chip" x="1168" y="672" width="516" height="76" rx="11"/>
-      <use href="#ic-postgres" x="1184" y="688" width="20" height="20"/>
-      <text x="1212" y="694" class="ct">model_price · model_capability</text>
-      <text x="1212" y="712" class="li">effective-dated price rows; capability tier bounds the downgrade</text>
-      <text x="1212" y="730" class="dm">V4__price_versioning · V9__model_capability · V14__live_model_price</text>
+      <!-- ===================== ASYNC ===================== -->
+      <text x="36" y="574" class="grp">ASYNC · OFF THE HOT PATH</text>
 
-      <g class="node" id="dep-redis">
-        <rect class="chip" x="1168" y="778" width="516" height="76" rx="11"/>
-      </g>
-      <use href="#ic-redis" x="1184" y="794" width="20" height="20"/>
-      <text x="1212" y="800" class="ct">Redis counters  <tspan class="dm">rebuildable, never the truth</tspan></text>
-      <text x="1212" y="818" class="lm">budget:remaining:{scope}:{ref} · budget:limit:… · budget:none:…</text>
-      <text x="1212" y="836" class="dm">plain DECRBY / INCRBY on integer nanos - no INCRBYFLOAT drift</text>
+      <rect x="36" y="584" width="620" height="106" rx="14" class="cont"/>
+      <g class="node" id="an-kafka"><rect class="shape" x="52" y="610" width="120" height="54" rx="11" filter="url(#card)"/></g>
+      <use href="#ic-kafka" x="66" y="626" width="22" height="22"/>
+      <text x="96" y="634" class="nn">Kafka</text>
+      <text x="96" y="650" class="mono">usage-events</text>
 
-      <!-- upstream block spanning forward + meter -->
-      <g class="node" id="dep-upstream">
-        <rect class="chip" x="1168" y="884" width="516" height="194" rx="12"/>
-      </g>
-      <text x="1184" y="904" class="pt">UPSTREAM PROVIDERS</text>
-      <use href="#ic-openai" x="1184" y="914" width="20" height="20"/>
-      <text x="1212" y="924" class="ct">OpenAI</text>
-      <text x="1212" y="940" class="dm">provider/openai/OpenAiAdapter · models without a prefix</text>
-      <use href="#ic-anthropic" x="1184" y="952" width="20" height="20"/>
-      <text x="1212" y="962" class="ct">Anthropic</text>
-      <text x="1212" y="978" class="dm">provider/anthropic/AnthropicAdapter · claude*</text>
-      <use href="#ic-gemini" x="1184" y="990" width="20" height="20"/>
-      <text x="1212" y="1000" class="ct">Gemini / Vertex</text>
-      <text x="1212" y="1016" class="dm">GeminiAdapter + VertexTokenProvider (ADC) · gemini*</text>
-      <use href="#ic-mock" x="1184" y="1028" width="20" height="20" style="color:#94a3b8"/>
-      <text x="1212" y="1038" class="ct" fill="#64748b">Mock upstream  <tspan class="dm">default, $0 dev</tspan></text>
-      <text x="1212" y="1054" class="dm">/mock/openai/v1/chat/completions · /mock/anthropic/v1/messages</text>
-      <text x="1212" y="1070" class="dm">/mock/gemini/v1beta/models/{model}:generateContent | :streamGenerateContent</text>
+      <path class="async" marker-end="url(#tipl)" d="M176 637 H206"/>
+      <g class="node" id="an-cons"><rect class="chip" x="210" y="610" width="130" height="54" rx="11"/></g>
+      <use href="#ic-swap" x="224" y="626" width="22" height="22" style="color:#0891b2"/>
+      <text x="254" y="642" class="nn">Consumer</text>
 
-      <g class="node" id="dep-usage">
-        <rect class="chip" x="1168" y="1096" width="516" height="76" rx="11"/>
-      </g>
-      <use href="#ic-postgres" x="1184" y="1112" width="20" height="20"/>
-      <text x="1212" y="1118" class="ct">usage_record  <tspan class="dm">the billing source of truth</tspan></text>
-      <text x="1212" y="1136" class="li">tokens in/out, cost_nanos, model, decision, savings_nanos</text>
-      <text x="1212" y="1154" class="dm">unique on idempotency_key -&gt; a retried request never double-charges</text>
+      <path class="async" marker-end="url(#tipl)" d="M344 637 H374"/>
+      <g class="node" id="an-ch"><rect class="shape" x="378" y="610" width="120" height="54" rx="11" filter="url(#card)"/></g>
+      <use href="#ic-clickhouse" x="392" y="626" width="22" height="22"/>
+      <text x="422" y="642" class="nn">ClickHouse</text>
 
-      <rect class="chip" x="1168" y="1202" width="516" height="76" rx="11"/>
-      <use href="#ic-key" x="1184" y="1218" width="20" height="20" style="color:#0d9488"/>
-      <text x="1212" y="1224" class="ct">audit_record  <tspan class="dm">every decision is queryable</tspan></text>
-      <text x="1212" y="1242" class="li">original vs executed model, reason, matched rule, blocked scope</text>
-      <text x="1212" y="1260" class="dm">written for rejections too - a 403 or 402 still leaves an explanation</text>
+      <path class="async" marker-end="url(#tipl)" d="M502 637 H532"/>
+      <g class="node" id="an-api"><rect class="chip" x="536" y="610" width="106" height="54" rx="11"/></g>
+      <use href="#ic-chart" x="550" y="626" width="22" height="22" style="color:#0ea5e9"/>
+      <text x="580" y="642" class="nn">Analytics</text>
 
-      <!-- response headers strip -->
-      <rect x="1168" y="1298" width="516" height="12" rx="6" fill="none"/>
+      <!-- observability -->
+      <rect x="676" y="584" width="380" height="106" rx="14" class="cont"/>
+      <g class="node" id="ob-metrics"><rect class="chip" x="692" y="610" width="106" height="54" rx="11"/></g>
+      <use href="#ic-chart" x="706" y="626" width="22" height="22" style="color:#0ea5e9"/>
+      <text x="736" y="642" class="nn">Metrics</text>
 
-      <!-- ============================ BOTTOM PANELS ============================ -->
+      <path class="async" marker-end="url(#tipl)" d="M800 637 H818"/>
+      <g class="node" id="ob-prom"><rect class="shape" x="822" y="610" width="112" height="54" rx="11" filter="url(#card)"/></g>
+      <use href="#ic-prometheus" x="832" y="626" width="22" height="22"/>
+      <text x="858" y="642" class="nn">Prometheus</text>
 
-      <!-- DATA PLANE -->
-      <rect x="36" y="1374" width="600" height="352" rx="16" class="pnl" filter="url(#soft)"/>
-      <text x="56" y="1400" class="pt">DATA PLANE  ·  POSTGRES IS TRUTH, REDIS IS A FAST MIRROR</text>
+      <path class="async" marker-end="url(#tipl)" d="M938 637 H956"/>
+      <g class="node" id="ob-graf"><rect class="shape" x="960" y="610" width="84" height="54" rx="11" filter="url(#card)"/></g>
+      <use href="#ic-grafana" x="970" y="626" width="22" height="22"/>
+      <text x="996" y="642" class="nn">Grafana</text>
 
-      <g class="node" id="db-postgres">
-        <path class="shape" d="M60 1430 L60 1478 A26 7 0 0 0 112 1478 L112 1430"/>
-        <ellipse class="shape" cx="86" cy="1430" rx="26" ry="7"/>
-      </g>
-      <use href="#ic-postgres" x="74" y="1442" width="24" height="24"/>
-      <text x="86" y="1502" text-anchor="middle" class="nn">PostgreSQL</text>
-      <text x="86" y="1518" text-anchor="middle" class="dm">+ pgvector</text>
+      <!-- admin -->
+      <text x="1076" y="574" class="grp">ADMIN · RUNTIME, NO REDEPLOY</text>
+      <rect x="1076" y="584" width="348" height="106" rx="14" class="cont"/>
+      <use href="#ic-admin" x="1092" y="602" width="20" height="20" style="color:#7c3aed"/>
+      <text x="1120" y="616" class="nn">/admin/*</text>
+      <text x="1092" y="638" class="mono">budgets · policies · keys · approvals</text>
 
-      <text x="132" y="1432" class="li">Flyway owns the schema (V1 … V14). Hibernate runs</text>
-      <text x="132" y="1450" class="li">ddl-auto=validate, so entities are checked, never authoritative.</text>
-      <text x="132" y="1476" class="dm">tenant          team            project         api_key</text>
-      <text x="132" y="1492" class="dm">budget          policy_rule     model_price     model_capability</text>
-      <text x="132" y="1508" class="dm">usage_record    audit_record    pending_approval admin_audit</text>
-      <text x="132" y="1524" class="dm">prompt_cache</text>
+      <use href="#ic-clock" x="1092" y="652" width="18" height="18" style="color:#d97706"/>
+      <rect x="1120" y="653" width="52" height="20" rx="10" fill="#fffbeb" stroke="#fde68a" stroke-width="1.1"/>
+      <text x="1146" y="667" class="pill" fill="#b45309">pending</text>
+      <path class="thin" marker-end="url(#tipl)" d="M1174 663 H1186"/>
+      <rect x="1190" y="653" width="58" height="20" rx="10" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.1"/>
+      <text x="1219" y="667" class="pill" fill="#16a34a">approved</text>
+      <rect x="1256" y="653" width="50" height="20" rx="10" fill="#fef2f2" stroke="#fecaca" stroke-width="1.1"/>
+      <text x="1281" y="667" class="pill" fill="#dc2626">rejected</text>
+      <rect x="1314" y="653" width="52" height="20" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.1"/>
+      <text x="1340" y="667" class="pill" fill="#94a3b8">expired</text>
 
-      <g class="node" id="db-redis">
-        <path class="shape" d="M60 1568 L60 1616 A26 7 0 0 0 112 1616 L112 1568"/>
-        <ellipse class="shape" cx="86" cy="1568" rx="26" ry="7"/>
-      </g>
-      <use href="#ic-redis" x="74" y="1580" width="24" height="24"/>
-      <text x="86" y="1640" text-anchor="middle" class="nn">Redis</text>
+      <text x="36" y="726" class="elbl">governance gateway, not a reliability one · budget enforcement fails open, on purpose</text>
 
-      <text x="132" y="1570" class="li">Counters are a cache, not a record. Any key can be rebuilt as</text>
-      <text x="132" y="1588" class="lm">limit - ledger spend</text>
-      <text x="132" y="1606" class="li">via BudgetService.rebuild, written with SETNX so a concurrent</text>
-      <text x="132" y="1622" class="li">writer is never clobbered. Handles cold start and drift repair.</text>
-      <text x="132" y="1648" class="li">Money is integer nanodollars end to end; the hot path may reserve</text>
-      <text x="132" y="1664" class="li">at a briefly stale cached rate, but the ledger always charges the</text>
-      <text x="132" y="1680" class="li">exact effective-dated price.</text>
-      <text x="132" y="1706" class="dm" fill="#d97706">fail-open by design: if Redis is unreachable the request proceeds</text>
-
-      <!-- ANALYTICS -->
-      <rect x="666" y="1374" width="512" height="352" rx="16" class="pnl" filter="url(#soft)"/>
-      <text x="686" y="1400" class="pt">ANALYTICS  ·  OFF THE HOT PATH (STAGE 5)</text>
-
-      <g class="node" id="an-kafka">
-        <rect class="shape" x="686" y="1420" width="132" height="52" rx="10"/>
-        <line x1="730" y1="1420" x2="730" y2="1472" stroke="#e6ebf2" stroke-width="1.2"/>
-        <line x1="774" y1="1420" x2="774" y2="1472" stroke="#e6ebf2" stroke-width="1.2"/>
-      </g>
-      <use href="#ic-kafka" x="740" y="1434" width="24" height="24"/>
-      <text x="752" y="1490" text-anchor="middle" class="nn">Kafka</text>
-      <text x="836" y="1436" class="lm">costpilot.usage-events</text>
-      <text x="836" y="1454" class="lm" fill="#dc2626">costpilot.usage-events.dlq</text>
-      <text x="836" y="1474" class="li">published after the request settles,</text>
-      <text x="836" y="1490" class="li">never inside it</text>
-
-      <path class="async" marker-end="url(#tipl)" d="M752 1500 V1530"/>
-      <rect class="chip" x="686" y="1534" width="472" height="46" rx="10"/>
-      <text x="700" y="1552" class="ct">analytics/ingest/UsageEventConsumer</text>
-      <text x="700" y="1570" class="dm">consumes, deduplicates and sinks into ClickHouse</text>
-
-      <path class="async" marker-end="url(#tipl)" d="M752 1584 V1604"/>
-      <g class="node" id="an-ch">
-        <path class="shape" d="M700 1614 L700 1656 A26 7 0 0 0 752 1656 L752 1614"/>
-        <ellipse class="shape" cx="726" cy="1614" rx="26" ry="7"/>
-      </g>
-      <use href="#ic-clickhouse" x="714" y="1624" width="24" height="24"/>
-      <text x="726" y="1680" text-anchor="middle" class="nn">ClickHouse</text>
-      <text x="726" y="1696" text-anchor="middle" class="dm">costpilot.usage_events</text>
-
-      <text x="790" y="1620" class="li">A second, non-primary JDBC datasource.</text>
-      <text x="790" y="1636" class="li">Flyway and JPA own Postgres only.</text>
-      <text x="790" y="1660" class="lm">GET /api/analytics/</text>
-      <text x="790" y="1676" class="dm">spend · trends · top-spenders · decisions</text>
-      <text x="790" y="1692" class="dm">budget-utilization · savings · reconcile</text>
-      <text x="790" y="1712" class="li" fill="#d97706">/reconcile diffs ClickHouse against the ledger</text>
-
-      <!-- OBSERVABILITY -->
-      <rect x="1208" y="1374" width="476" height="352" rx="16" class="pnl" filter="url(#soft)"/>
-      <text x="1228" y="1400" class="pt">OBSERVABILITY (6.2)</text>
-
-      <use href="#ic-chart" x="1228" y="1418" width="20" height="20" style="color:#0ea5e9"/>
-      <text x="1256" y="1432" class="ct">metrics/GovernanceMetrics</text>
-      <text x="1228" y="1454" class="dm">costpilot.budget.guard          (guard latency)</text>
-      <text x="1228" y="1470" class="dm">costpilot.budget.rejections     costpilot.downgrades</text>
-      <text x="1228" y="1486" class="dm">costpilot.budget.soft_limit_warnings</text>
-      <text x="1228" y="1502" class="dm">costpilot.policy.rejections     costpilot.stream.cutoffs</text>
-      <text x="1228" y="1518" class="dm">costpilot.cache.hits / .misses / .savings_nanos</text>
-      <text x="1228" y="1534" class="dm">costpilot.routing.routed / .savings_nanos</text>
-      <text x="1228" y="1550" class="dm">costpilot.tokens                costpilot.upstream</text>
-
-      <path class="async" marker-end="url(#tipl)" d="M1290 1562 V1590"/>
-      <text x="1306" y="1580" class="dm">/actuator/prometheus</text>
-
-      <g class="node" id="ob-prom">
-        <path class="shape" d="M1240 1600 L1240 1642 A26 7 0 0 0 1292 1642 L1292 1600"/>
-        <ellipse class="shape" cx="1266" cy="1600" rx="26" ry="7"/>
-      </g>
-      <use href="#ic-prometheus" x="1254" y="1610" width="24" height="24"/>
-      <text x="1266" y="1666" text-anchor="middle" class="nn">Prometheus</text>
-
-      <path class="async" marker-end="url(#tipl)" d="M1300 1622 H1372"/>
-      <text x="1336" y="1614" text-anchor="middle" class="elbl">viz</text>
-
-      <g class="node" id="ob-graf">
-        <rect class="shape" x="1382" y="1596" width="120" height="52" rx="10"/>
-        <line x1="1382" y1="1616" x2="1502" y2="1616" stroke="#e6ebf2" stroke-width="1.2"/>
-      </g>
-      <use href="#ic-grafana" x="1430" y="1620" width="24" height="24"/>
-      <text x="1442" y="1666" text-anchor="middle" class="nn">Grafana</text>
-
-      <text x="1228" y="1686" class="li">Dashboard is auto-provisioned by compose. Guard-latency</text>
-      <text x="1228" y="1702" class="li">quantiles in the README are read from Prometheus at the</text>
-      <text x="1228" y="1718" class="li">measurement window, not from the decaying summary.</text>
-
-      <!-- scope guardrail note -->
-      <text x="36" y="1752" class="dm" fill="#94a3b8">Scope guardrail: this is a governance gateway, not a reliability one. No circuit breakers, no failover, no health or latency routing. The one deliberate reliability stance is fail-open budget enforcement.</text>
-
-      <!-- moving packets -->
-      <circle id="pk1" class="pk" r="7.5" fill="url(#pg)" filter="url(#pglow)" opacity="0" cx="300" cy="286"/>
-      <circle id="pk2" class="pk" r="5.5" fill="url(#pg)" filter="url(#pglow)" opacity="0" cx="379" cy="286"/>
+      <!-- packets -->
+      <circle id="pk1" class="pk" r="7" fill="url(#pg)" filter="url(#pglow)" opacity="0" cx="186" cy="245"/>
 
       <script><![CDATA[
         (function(){
           var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
           function $(id){ return document.getElementById(id); }
-          function on(id){ var e=$(id); if(e) e.classList.add('active'); }
-          function off(id){ var e=$(id); if(e) e.classList.remove('active'); }
-          function pulse(id,ms){ var e=$(id); if(!e) return; e.classList.add('pulse'); setTimeout(function(){ e.classList.remove('pulse'); }, ms||1200); }
           function ease(k){ return k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; }
           function move(el,x0,y0,x1,y1,dur){
             return new Promise(function(res){
@@ -617,48 +410,57 @@
           }
           function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
 
-          // stage centres: one column at x=379, pitch 106
-          var S=[], ids=[];
-          for(var i=0;i<10;i++){ S.push([379, 286 + i*106]); ids.push('st-'+i); }
-          var HOP=380, HOLD=340;
+          // what each step touches - lit together with the step, so the diagram
+          // below is always in sync with where the request currently is
+          var TOUCHES = [
+            ['tb-apikey','db-postgres'],                                  // 1 auth
+            [],                                                           // 2 normalize
+            ['tb-policy','db-postgres','ex-policy'],                      // 3 policy
+            ['tb-cache','db-postgres'],                                   // 4 cache
+            ['tb-price','db-postgres'],                                   // 5 route
+            ['tb-budget','db-redis','ex-budget'],                         // 6 budget
+            [null],                                                       // 7 forward -> provider, filled in below
+            ['ex-meter'],                                                 // 8 meter
+            ['tb-usage','db-postgres'],                                   // 9 ledger
+            ['tb-audit','db-postgres','an-kafka','an-cons','an-ch','an-api',
+             'ob-metrics','ob-prom','ob-graf','ex-ok']                    // 10 settle
+          ];
+          var provs=['pv-openai','pv-anthropic','pv-gemini'];
 
-          // primary packet: full journey + stage highlight + dependency pulses
-          var pk1=$('pk1');
+          var S=[];
+          for(var i=0;i<10;i++){ S.push([274 + i*102, 245]); }
+
+          function lit(i,on,loop){
+            var st=$('st-'+i); if(st) st.classList.toggle('active',on);
+            var list = i===6 ? [provs[loop%3]] : TOUCHES[i];
+            list.forEach(function(id){
+              if(!id) return;
+              var e=$(id); if(e) e.classList.toggle('lit',on);
+            });
+          }
+
+          var pk1=$('pk1'); var loop=0;
+          var HOP=380, HOLD=520;
+
           async function hero(){
             pk1.setAttribute('opacity','1');
-            await move(pk1,300,286,S[0][0],S[0][1],460); on(ids[0]); pulse('dep-apikey',1200); await sleep(HOLD);
+            await move(pk1,186,245,S[0][0],S[0][1],440);
+            lit(0,true,loop); await sleep(HOLD);
             for(var i=1;i<S.length;i++){
+              lit(i-1,false,loop);
               await move(pk1,S[i-1][0],S[i-1][1],S[i][0],S[i][1],HOP);
-              off(ids[i-1]); on(ids[i]);
-              if(i===3) pulse('dep-cache',1200);
-              if(i===5) pulse('dep-redis',1300);
-              if(i===6) pulse('dep-upstream',1400);
-              if(i===8){ pulse('dep-usage',1300); pulse('db-postgres',1300); }
-              if(i===9){ pulse('an-kafka',1300);
-                setTimeout(function(){pulse('an-ch',1200);},600);
-                setTimeout(function(){pulse('ob-prom',1200);},380);
-                setTimeout(function(){pulse('ob-graf',1200);},900); }
+              lit(i,true,loop);
               await sleep(HOLD);
             }
-            await sleep(300);
-            off(ids[9]); pk1.setAttribute('opacity','0');
-            await sleep(700);
+            await sleep(400);
+            lit(9,false,loop); pk1.setAttribute('opacity','0');
+            loop++;
+            await sleep(800);
             hero();
           }
 
-          // secondary packet: decorative conveyor, no highlights
-          var pk2=$('pk2');
-          async function ghost(){
-            pk2.setAttribute('opacity','.6');
-            for(var i=1;i<S.length;i++){ await move(pk2,S[i-1][0],S[i-1][1],S[i][0],S[i][1],HOP+140); }
-            pk2.setAttribute('opacity','0');
-            await move(pk2,379,286,379,286,1);
-            await sleep(900);
-            ghost();
-          }
-
-          if(reduce){ on('st-5'); }
-          else { hero(); setTimeout(ghost, 2600); }
+          if(reduce){ lit(5,true,0); }
+          else { hero(); }
         })();
       ]]></script>
     </svg>
