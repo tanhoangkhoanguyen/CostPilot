@@ -1,62 +1,71 @@
 <div align="center">
 
+<img src="docs/Avatar_Costpilot.png" width="170" alt="CostPilot mascot: a small robot in a pilot cap holding a magnifying glass over a spending chart">
+
 # CostPilot
 
-<a href="https://github.com/tanhoangkhoanguyen/CostPilot">
-  <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=21&pause=1200&color=F97316&center=true&vCenter=true&width=820&height=46&lines=Nobody+knew+who+was+spending+the+money.;The+bill+only+showed+up+at+the+end+of+the+month.;By+then+the+money+was+already+gone.;So+I+put+a+gate+in+front+of+the+models." alt="Nobody knew who was spending the money. The bill only showed up at the end of the month. By then the money was already gone. So I put a gate in front of the models." />
-</a>
+*Nobody knew who was spending the money.*<br>
+*The bill only showed up at the end of the month, and by then it was gone.*
 
 **An AI spending gateway that says no before the money is gone.**
 
-Your apps call CostPilot instead of OpenAI, Anthropic or Gemini.
-CostPilot decides, per request, at runtime: who may spend, on which model, and how much.
-
 <p>
-<img alt="Java 21" src="https://img.shields.io/badge/Java-21-e76f00?style=flat-square&logo=openjdk&logoColor=white">
-<img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?style=flat-square&logo=springboot&logoColor=white">
-<img alt="Postgres" src="https://img.shields.io/badge/Postgres-pgvector-4169E1?style=flat-square&logo=postgresql&logoColor=white">
-<img alt="Redis" src="https://img.shields.io/badge/Redis-counters-FF4438?style=flat-square&logo=redis&logoColor=white">
-<img alt="Kafka" src="https://img.shields.io/badge/Kafka-%E2%86%92%20ClickHouse-231F20?style=flat-square&logo=apachekafka&logoColor=white">
-<br>
-<a href="https://github.com/tanhoangkhoanguyen/CostPilot/actions"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/tanhoangkhoanguyen/CostPilot/ci.yml?style=flat-square&label=build"></a>
-<img alt="Tests" src="https://img.shields.io/badge/tests-170%2B-16a34a?style=flat-square">
-<img alt="Guard latency" src="https://img.shields.io/badge/budget%20decision-p50%202.7ms-0ea5e9?style=flat-square">
-<img alt="Demo cost" src="https://img.shields.io/badge/demo%20cost-%240-7c3aed?style=flat-square">
+<img height="56" alt="Java 21" src="https://cdn.simpleicons.org/openjdk/5382A1">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img height="56" alt="Spring Boot" src="https://cdn.simpleicons.org/springboot/6DB33F">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img height="56" alt="Postgres + pgvector" src="https://cdn.simpleicons.org/postgresql/5D8FD6">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img height="56" alt="Redis" src="https://cdn.simpleicons.org/redis/FF5449">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img height="56" alt="Kafka" src="https://cdn.simpleicons.org/apachekafka/8F98A6">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img height="56" alt="ClickHouse" src="https://cdn.simpleicons.org/clickhouse/EFB100">
 </p>
 
-<a href="docs/README.md"><b>Setup and usage docs</b></a> · <a href="ROADMAP.md">Roadmap</a> · <a href="BENCHMARK.md">Benchmarks</a>
+<a href="docs/README.md"><b>Setup and usage docs</b></a> · <a href="ROADMAP.md">Roadmap</a>
 
 </div>
 
 ---
 
-## What we kept seeing
+## The problem
 
-Every team that starts building on top of a model provider goes through the same three months.
+<img src="docs/Scene1.png" alt="A developer happily drops a glowing API key into a treasure chest while fireworks play on the screen behind him">
 
-Month one is fun. Somebody drops an API key into a config file, ships a feature, and it works. Month two, three more services want the same key, so they get it. A batch job starts running nightly. Someone tries the bigger model because the small one was a little dull, and it turns out the bigger model is fifteen times the price. Nobody notices, because nothing on the screen changes.
+**Month one.** Somebody drops an API key into a config file, ships a feature, and it works. Everyone is delighted.
 
-Month three, the invoice arrives.
+<img src="docs/Scene2.png" alt="The same API key has spread to a nightly robot, a salesperson and another developer, while a monster in the corner eats a pile of cash">
 
-And this is the part that always struck me: at that moment, nobody in the room can answer basic questions. Which team spent it. Which feature. Was it the nightly job or the demo someone left running over the weekend. The provider dashboard shows one number for one key, and that key belongs to everybody. So the meeting ends the way those meetings always end, with somebody saying we should be more careful, and nothing actually changing.
+**Month two.** That key is now in three more services, a nightly job and a client demo. Someone swaps in the bigger model because the small one felt dull. It costs fifteen times more. Nothing on the screen changes, so nobody notices.
 
-The tools we reached for did not help either. They were all dashboards. They told you, beautifully and in colour, what you had already spent. But a dashboard is a rear view mirror. It cannot stop anything. By the time a chart goes red, the money is spent, and no chart has ever refunded a dollar.
+<img src="docs/Scene3.png" alt="A meeting room with an enormous invoice unrolling across the table while everyone points at each other">
 
-So the problem was never that we could not see the spending. It was that seeing was all we could do.
+**Month three.** The invoice arrives, and nobody in the room can say which team spent it, or on what. One key, one number, everybody's fingerprints.
 
-## What I did about it
+<img src="docs/Scene4.png" alt="A driver watching a spiking cost chart in the rear view mirror while the road ahead ends at a cliff">
 
-I moved the decision to the moment it actually matters: before the request goes out.
+Every tool we reached for was a dashboard. A dashboard is a rear view mirror. By the time a chart turns red, the money is already behind you.
 
-CostPilot sits between your app and the model providers and speaks the OpenAI API, so from your side it is a one line change to `base_url`. But every request that passes through gets asked a few questions first. Who are you. Are you allowed to use this model. Is there budget left. Can we answer this from a cache instead. Is there a cheaper model that still meets the bar you asked for.
+> **No chart has ever refunded a dollar.**
+> Seeing the spending was never the problem. Seeing was all we could do.
 
-If the answer is no, the request never leaves the building. You get a `402` with a machine readable reason, not a surprise at the end of the month.
+## The approach
 
-And because a streaming answer can quietly run much longer than anyone estimated, the meter keeps running while the tokens come back. When the spend crosses the line mid answer, the stream is cut cleanly, with a proper `finish_reason` and a `[DONE]`, and only the tokens actually delivered get billed. The overshoot is bounded to a single chunk.
+Move the decision to where it matters: before the request leaves.
 
-None of this is worth much if it makes engineers hate you, so the whole governance decision has to disappear into the noise. It does: the budget check lands at 2.7 ms at the median under 100 requests per second.
+<img src="docs/Scene5.png" alt="The CostPilot mascot flying between a Your App cloud and a Model Provider cloud, holding the connection, next to an editor showing a changed base_url">
 
-## One request, end to end
+**One line on your side.** CostPilot sits between your app and the providers and speaks the OpenAI API, so all you change is `base_url`.
+
+<img src="docs/Scene6.png" alt="The mascot at a checkpoint desk questioning each request, then holding a stop sign that reads HTTP 402 budget exceeded">
+
+**Every request gets questioned first.** Who are you. May you use this model. Can a cache answer this instead. Is there budget left. If the answer is no, the request never leaves, and you get a `402` with a reason your code can read.
+
+<img src="docs/Scene7.png" alt="A stream of tokens flowing until a limit gauge redlines, then the mascot snips the stream cleanly and the rest of the budget stays unspent">
+
+**The meter keeps running while it streams.** An answer can run far longer than anyone estimated, so when the spend crosses the line the stream is cut clean, with a real `finish_reason` and a `[DONE]`. You pay for what arrived. The overshoot is one chunk.
+
+<img src="docs/Scene8.png" alt="A calm office, feet on the desk, a screen reading budget status safe, and the mascot giving a thumbs up">
+
+And it has to be invisible, or engineers will route around it. The whole check lands at 2.7 ms median under 100 requests per second.
+
+## Architecture
 
 Ten steps. Everything the request touches lights up as it goes.
 
@@ -64,8 +73,8 @@ Ten steps. Everything the request touches lights up as it goes.
   <img src="docs/diagram.gif" alt="A live request moving through the CostPilot pipeline: auth, normalize, policy, cache, route, budget, forward, meter, ledger, settle" width="100%">
 </p>
 
-| | step | what it decides |
-|---|---|---|
+| # | step | decides |
+|:---:|---|---|
 | 1 | **Auth** | who you are, from a hashed key, never from a header you sent |
 | 2 | **Normalize** | your OpenAI shaped request becomes one internal shape |
 | 3 | **Policy** | allow, deny, quietly downgrade, or hold for a human |
@@ -77,28 +86,7 @@ Ten steps. Everything the request touches lights up as it goes.
 | 9 | **Ledger** | write the real charge, once, even if you hang up |
 | 10 | **Settle** | release, publish, and leave an audit row explaining the verdict |
 
-Money is stored as whole nanodollars, never floats, so nothing drifts. Postgres is the truth. Redis is a fast copy that can be rebuilt from the ledger at any time.
-
-## What it is not
-
-It is not a reliability gateway. There are no circuit breakers, no failover, no routing by latency or health. That is a different product and doing both badly helps nobody.
-
-There is exactly one deliberate reliability decision in here: if the budget store is unreachable, the request goes through. A billing system should never be the reason your product is down. That is a choice, it is written down, and it is tested.
-
-## Does it hold up
-
-Everything below comes out of one command, `bash loadtest/run.sh`, and the claims are read back from the Postgres ledger afterwards rather than from the load tool.
-
-| claim | target | measured |
-|---|---|---|
-| budget decision overhead at 100 req/s | single digit ms | **p50 2.72 ms** / p95 7.57 ms |
-| teams that overspent their cap under flood | 0 | **0 of 30** (156 served, 144 blocked) |
-| worst mid stream cutoff overshoot | one chunk | **about 1.5 tokens** |
-| clean cutoff signal and valid statuses | 100% | **100%** |
-
-Measured on a laptop running the whole stack and the load generator at once. Full method and caveats live in [BENCHMARK.md](BENCHMARK.md).
-
-## Try it
+## Quickstart
 
 Docker is the only thing you need, and the demo costs nothing because the default upstream is a mock provider that lives inside the app.
 
@@ -115,5 +103,7 @@ Then walk through the ten minute demo, the CLI, the Python SDK, and going live w
 ---
 
 <div align="center">
+<img src="docs/Avatar_Costpilot.png" width="80" alt="">
+<br>
 <sub>Built because a dashboard has never stopped a single dollar from leaving.</sub>
 </div>
