@@ -18,6 +18,12 @@ java {
 	}
 }
 
+// pin source encoding so non-ASCII test data (Vietnamese/CJK token-estimate cases)
+// compiles identically on Windows and Linux CI, not the JVM platform default
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
 repositories {
 	mavenCentral()
 }

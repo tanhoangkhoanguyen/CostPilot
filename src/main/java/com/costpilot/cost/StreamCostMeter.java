@@ -21,9 +21,13 @@ import com.costpilot.domain.ModelPrice;
  * authoritative usage only in the FINAL chunk. A one-token-per-chunk counter
  * therefore under-counts a Gemini stream by ~40x mid-flight, so the 4.3 cutoff
  * check never trips and the whole response is billed (overshoot unbounded). A
- * ~4-chars-per-token estimate (the widely-used rule of thumb) tracks real
- * generation closely enough on every provider for the cutoff to fire on time;
- * the provider's exact count still wins for the ledger the instant it arrives.
+ * length-based estimate tracks real generation closely enough on every provider
+ * for the cutoff to fire on time; the provider's exact count still wins for the
+ * ledger the instant it arrives.
+ *
+ * <p>The length-to-token estimate is script-weighted ({@link TokenLengthEstimator})
+ * rather than a flat chars/4, so non-Latin generations (Vietnamese, CJK) that
+ * tokenize denser don't lag the running cost and slip the cutoff (#89).
  *
  * <p>Pure in-memory arithmetic on the streaming path: no buffering, no I/O.
  */
@@ -40,12 +44,10 @@ public class StreamCostMeter {
 	 */
 	private final int assumedInputTokens;
 
-	/** ~4 characters per token - the standard rough tokenizer heuristic. */
-	private static final int CHARS_PER_TOKEN = 4;
-
 	private final AtomicInteger reportedInputTokens = new AtomicInteger();
 	private final AtomicInteger reportedOutputTokens = new AtomicInteger();
-	private final AtomicLong contentChars = new AtomicLong();
+	/** Running script-weighted output estimate in millitokens (tokens x 1000). */
+	private final AtomicLong estimatedOutputMillitokens = new AtomicLong();
 
 	StreamCostMeter(ModelPrice price, CostCalculator calculator, int assumedInputTokens) {
 		this.price = price;
@@ -55,7 +57,7 @@ public class StreamCostMeter {
 
 	public void observe(CanonicalStreamChunk chunk) {
 		if (chunk.contentDelta() != null && !chunk.contentDelta().isEmpty()) {
-			contentChars.addAndGet(chunk.contentDelta().length());
+			estimatedOutputMillitokens.addAndGet(TokenLengthEstimator.millitokens(chunk.contentDelta()));
 		}
 		if (chunk.usage() != null) {
 			reportedInputTokens.accumulateAndGet(chunk.usage().inputTokens(), Math::max);
@@ -64,14 +66,21 @@ public class StreamCostMeter {
 	}
 
 	/**
-	 * Provider-reported output wins once present; before that, a length-based
-	 * estimate (ceil chars/4) stands in so the mid-stream cutoff sees a realistic
-	 * running cost on providers that chunk many tokens at a time (12.1).
+	 * Provider-reported output wins once present; before that, a script-weighted
+	 * length estimate stands in so the mid-stream cutoff sees a realistic running
+	 * cost on providers that chunk many tokens at a time (12.1) and on non-Latin
+	 * text that tokenizes denser than English (#89).
 	 */
 	public Usage usage() {
 		int input = reportedInputTokens.get() > 0 ? reportedInputTokens.get() : assumedInputTokens;
-		int estimatedOutput = (int) ((contentChars.get() + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN);
-		return new Usage(input, Math.max(reportedOutputTokens.get(), estimatedOutput));
+		// the provider's own count is authoritative for the ledger; the estimate only
+		// stands in until it arrives (symmetric with the input side above)
+		if (reportedOutputTokens.get() > 0) {
+			return new Usage(input, reportedOutputTokens.get());
+		}
+		// ceil(millitokens / 1000) - the script-weighted running estimate
+		int estimatedOutput = (int) ((estimatedOutputMillitokens.get() + 999) / 1000);
+		return new Usage(input, estimatedOutput);
 	}
 
 	public Cost runningCost() {
