@@ -29,29 +29,62 @@ honest, provider-dependent result.
 | claim | result | source |
 |---|---|---|
 | Teams overspending their cap under concurrent flood | **0** — mock 0/30, live Vertex breach=false | ledger |
-| Budget-guard decision latency (mock, 100 req/s sustained) | p50 **4.947968 ms** / p95 **29.32736 ms** / p99 **44.007424 ms** | Prometheus |
+| Budget-guard decision latency, p99 (mock, 100 req/s sustained) | **14.123008 ms** | Prometheus |
 | Price correctness | billed = provider-reported tokens × published price (exact) | ledger |
 
-**Guard latency — measurement method + honest tail.** Two-host run: the gateway stack on one
-VM, the k6 load generator on a *separate* VM, so the generator can't steal CPU from the JVM
-recording the latency. 100 req/s was sustained through the measured window (confirmed from
-Prometheus, `rate(costpilot_budget_guard_seconds_count[15s]) ≈ 100`). Quantiles are read from
-Prometheus at the window tail (`max_over_time(costpilot_budget_guard_seconds{quantile}[15s])`),
-not from k6's client-side round-trip — those are measured server-side around `BudgetGuard.reserve`
-(`GovernedRequestExecutor.java:100-124`), so the client→gateway network hop is outside the span.
+**Guard latency — measurement method.** Two-host run on identical VMs (both GCP `e2-standard-4`,
+4 vCPU / 16 GB, `us-central1-a`, Ubuntu 22.04): the gateway stack on one, the k6 load generator
+on a *separate* VM in the same zone, so the generator can't steal CPU from the JVM recording the
+latency. 100 req/s was sustained through the measured window (confirmed from Prometheus,
+`rate(costpilot_budget_guard_seconds_count[15s]) = 100`). Quantiles are read from Prometheus at
+the window tail, **not** from k6's client-side round-trip — the Timers are recorded server-side
+inside `BudgetGuard.reserve` (`GovernedRequestExecutor.java:100-124`), so the client→gateway
+network hop is outside the measured span and running the generator on a second host only removes
+CPU contention.
 
-- **p50 4.947968 ms** is the warm path: pure Redis Lua reservation across the governed scopes.
-- **p99 44.007424 ms** is the tail: `reserve()` also does the model **price lookup**, cached for 30 s
-  (`BudgetGuard.java:181-201`). On a cache miss it falls through to Postgres; the first requests
-  after each expiry (and after a fresh counter rebuild) pay that DB hit. The tail is the
-  price-cache/counter-rebuild path, **not** the Redis reservation.
+**Where the time goes (timer split).** `reserve()` is instrumented as three Timers so the p99
+can be *attributed*, not guessed: the total, the Redis Lua reservation phase, and the price
+lookup (tagged cache `hit`/`miss`). p99 at the window tail:
 
-*Single-instance, client-side summary quantiles (`GovernanceMetrics.java:42-45`) — not aggregated
-across instances (no load balancer, by design; aggregating summary quantiles would be invalid).*
+| phase | metric | p99 |
+|---|---|---|
+| **total** | `costpilot_budget_guard_seconds` | 14.123008 ms |
+| **Redis Lua reservation** | `costpilot_budget_guard_reserve_seconds` | 14.123008 ms |
+| price lookup, cache miss (Postgres) | `costpilot_budget_guard_price_lookup_seconds{outcome="miss"}` | 1.769472 ms |
 
-> Supersedes an earlier **17.79 ms** figure that was measured with the generator co-located with
-> the stack on one laptop — CPU contention made it noise, not a defensible number. The figures
-> above are larger but reproducible and explainable; that trade is deliberate.
+Values are the exact Prometheus summary-quantile readings at the window tail (reproduced
+verbatim, not rounded); the trailing digits are the summary's bucket boundary.
+
+**Observed.** The `reserve` (Redis Lua) phase p99 equals the total p99; the price-lookup
+cache-miss phase p99 is **1.769472 ms**, ~8× smaller. The total is accounted for by the Redis
+reservation phase, not the price lookup.
+
+From the code (`BudgetGuard.reserve`, `GovernedRequestExecutor.java:100-124`): the reservation
+issues one Lua call **per governed scope**, iterating `BudgetScope.values()` = tenant, team,
+project, model (four scopes); the price lookup is served from a 30 s in-process cache
+(`BudgetGuard.java`) and reaches Postgres only on a miss.
+
+*Metric type: client-side **summary** quantiles (`GovernanceMetrics.java:42-45`) — per-process
+estimates, not exact percentiles, and not aggregatable across instances (single gateway process,
+no load balancer). `reserve` and `total` fall in the same summary bucket at this scale.*
+
+### Reproducing the guard-latency benchmark
+
+The benchmark spans two hosts. The full start→end runbook — provision two VMs, open the
+firewall, run, and scrape — is [`loadtest/REPRODUCE.md`](loadtest/REPRODUCE.md); its mechanical
+steps are wrapped in [`loadtest/guard-benchmark.sh`](loadtest/guard-benchmark.sh), one
+subcommand per host:
+
+```bash
+# VM-A: bash loadtest/guard-benchmark.sh stack                    # up + seed
+# VM-B: bash loadtest/guard-benchmark.sh load <VM-A-INTERNAL-IP>  # drive load, prints T0
+# VM-A: bash loadtest/guard-benchmark.sh scrape <T0>              # read p50/p95/p99 per phase
+```
+
+> **Cutoff over the two-host network.** k6 may report `cutoff: clean budget_cutoff signal 0/10`
+> (SSE-body detection is unreliable across the hop). That is a k6 false negative — the ledger is
+> authoritative and shows every `lt-cutoff-*` team billed to `cap + ~1.3 output tokens`
+> (one-chunk overshoot), i.e. the stream *was* cut off. Verify from Postgres, not k6's check line.
 
 **Price correctness caveat.** Verified against the provider's reported token counts × Google's
 published per-token price — **not** reconciled against the GCP invoice (sub-cent charges are
