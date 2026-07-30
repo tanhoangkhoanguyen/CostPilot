@@ -33,6 +33,7 @@ public class SemanticCacheService {
 	private static final Logger log = LoggerFactory.getLogger(SemanticCacheService.class);
 
 	private final PromptCacheRepository repository;
+	private final CacheHitLogRepository hitLog;
 	private final Embedder embedder;
 	private final GovernanceMetrics metrics;
 	private final ObjectMapper objectMapper;
@@ -41,13 +42,15 @@ public class SemanticCacheService {
 	private final boolean enabled;
 	private final double threshold;
 
-	public SemanticCacheService(PromptCacheRepository repository, Embedder embedder, GovernanceMetrics metrics,
-			ObjectMapper objectMapper, CostService costService, ProviderRegistry registry,
+	public SemanticCacheService(PromptCacheRepository repository, CacheHitLogRepository hitLog,
+			Embedder embedder, GovernanceMetrics metrics, ObjectMapper objectMapper, CostService costService,
+			ProviderRegistry registry,
 			// off by default; a cost-optimization the org opts into. Conservative 0.97
 			// cosine threshold keeps the false-hit rate low (precision over recall).
 			@Value("${costpilot.cache.enabled:false}") boolean enabled,
 			@Value("${costpilot.cache.similarity-threshold:0.97}") double threshold) {
 		this.repository = repository;
+		this.hitLog = hitLog;
 		this.embedder = embedder;
 		this.metrics = metrics;
 		this.objectMapper = objectMapper;
@@ -80,8 +83,16 @@ public class SemanticCacheService {
 		}
 		Hit h = hit.get();
 		metrics.cacheHit();
-		// 10.3: the hit avoided a provider call - its would-be cost is money saved
+		// 10.3 / #93: the hit avoided a provider call - its would-be cost is money saved.
+		// Persist to cache_hit_log (analytics money truth) AND the Prometheus counter
+		// (Grafana). Never write usage_record.savings_nanos here - that column is
+		// routing/downgrade only, so the two channels cannot double-count.
 		metrics.recordCacheSavings(h.costNanos());
+		try {
+			hitLog.record(ledger.tenantId(), ledger.teamId(), h.costNanos());
+		} catch (Exception e) {
+			log.warn("cache hit log skipped: {}", e.getMessage());
+		}
 		log.info("cache hit tenant={} team={} similarity={} savedNanos={}",
 				ledger.tenantId(), ledger.teamId(), h.similarity(), h.costNanos());
 		return deserialize(h.response());

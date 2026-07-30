@@ -19,6 +19,7 @@ import com.costpilot.analytics.dto.SpendBucket;
 import com.costpilot.analytics.dto.TopSpender;
 import com.costpilot.analytics.dto.TrendPoint;
 import com.costpilot.budget.BudgetService;
+import com.costpilot.cache.CacheHitLogRepository;
 import com.costpilot.domain.Budget;
 import com.costpilot.domain.BudgetRepository;
 import com.costpilot.domain.UsageRecordRepository;
@@ -37,13 +38,16 @@ public class AnalyticsQueryService {
 	private final ClickHouseProperties props;
 	private final UsageRecordRepository usageRepository;
 	private final BudgetRepository budgetRepository;
+	private final CacheHitLogRepository cacheHitLog;
 
 	public AnalyticsQueryService(@Qualifier("clickhouseJdbcTemplate") JdbcTemplate clickhouse,
-			ClickHouseProperties props, UsageRecordRepository usageRepository, BudgetRepository budgetRepository) {
+			ClickHouseProperties props, UsageRecordRepository usageRepository, BudgetRepository budgetRepository,
+			CacheHitLogRepository cacheHitLog) {
 		this.clickhouse = clickhouse;
 		this.props = props;
 		this.usageRepository = usageRepository;
 		this.budgetRepository = budgetRepository;
+		this.cacheHitLog = cacheHitLog;
 	}
 
 	// The only dimensions a caller may group by - whitelisted to a fixed column name so
@@ -171,17 +175,30 @@ public class AnalyticsQueryService {
 				.toList();
 	}
 
-	// 7.3: routing/downgrade savings over the window, from the Postgres ledger (money
-	// truth) - not ClickHouse. wouldBeSpend = actual executed spend + savings, i.e. what
-	// the originally-requested models would have cost. Team-scoped for a non-admin (6.1).
+	// 7.3 / 1.3 (#93): unified savings over the window from Postgres money truth —
+	// routing/downgrade in usage_record.savings_nanos, cache hits in cache_hit_log.
+	// wouldBeSpend = actual + routing + cache. percentSaved = total / wouldBe * 100.
+	// Team-scoped for a non-admin (6.1). Channels stay separate so they never double-count.
 	public SavingsSummary savings(Instant from, Instant to, String teamScope) {
-		long savingsNanos = teamScope == null
+		long routingNanos = teamScope == null
 				? usageRepository.totalSavingsNanosBetween(from, to)
 				: usageRepository.totalSavingsNanosForTeamBetween(teamScope, from, to);
+		long cacheNanos = teamScope == null
+				? cacheHitLog.totalSavingsNanosBetween(from, to)
+				: cacheHitLog.totalSavingsNanosForTeamBetween(teamScope, from, to);
+		long totalSavingsNanos = routingNanos + cacheNanos;
 		long actualNanos = BudgetService.toNanos(teamScope == null
 				? usageRepository.totalCostBetween(from, to)
 				: usageRepository.totalCostForTeamBetween(teamScope, from, to));
-		return new SavingsSummary(usd(savingsNanos), usd(actualNanos), usd(actualNanos + savingsNanos));
+		long wouldBeNanos = actualNanos + totalSavingsNanos;
+		Double percentSaved = wouldBeNanos == 0 ? null
+				: BigDecimal.valueOf(totalSavingsNanos)
+						.multiply(BigDecimal.valueOf(100))
+						.divide(BigDecimal.valueOf(wouldBeNanos), 1, RoundingMode.HALF_UP)
+						.doubleValue();
+		return new SavingsSummary(
+				usd(routingNanos), usd(cacheNanos), usd(totalSavingsNanos),
+				usd(actualNanos), usd(wouldBeNanos), percentSaved);
 	}
 
 	// 5.3/5.4 acceptance: ClickHouse totals reconcile with the Postgres ledger for a

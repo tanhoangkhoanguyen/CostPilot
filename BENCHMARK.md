@@ -90,6 +90,35 @@ subcommand per host:
 published per-token price — **not** reconciled against the GCP invoice (sub-cent charges are
 rounded/absorbed by free-trial credit and never surfaced a line item).
 
+## Cost savings — routing + semantic cache (mock, $0)
+
+Cost optimization is the product: route to the cheapest model that clears the min-tier bar,
+and serve repeat/similar prompts from the semantic cache at $0 provider cost. Both channels
+are measured in Postgres money truth and exposed as one total:
+
+| channel | ledger | counted in |
+|---|---|---|
+| Routing / downgrade | `usage_record.savings_nanos` | `routingSavingsUsd` |
+| Semantic cache hit | `cache_hit_log.savings_nanos` | `cacheSavingsUsd` |
+| **Combined** | sum of the two (no double-count) | `totalSavingsUsd` + `percentSaved` |
+
+`percentSaved = totalSavings / wouldBeSpend`, where `wouldBeSpend = actualSpend + totalSavings`
+(what the originally requested models would have cost without CostPilot).
+
+Reproduce (mock upstream, $0, no VM):
+
+```bash
+bash loadtest/run-savings.sh
+```
+
+| claim | result | source |
+|---|---|---|
+| Routing savings (20× gpt-4o → gpt-4o-mini, Min-Tier 1) | **$0.001316** | `usage_record.savings_nanos` |
+| Cache savings (5 prompts × 3 hits) | **$0.000119** | `cache_hit_log` |
+| **Combined $ / % saved** | **$0.001435 (92.1%)** of would-be $0.001559 | ledger = `GET /api/analytics/savings` |
+
+Numbers from `bash loadtest/run-savings.sh` on the $0 mock (2026-07-30). Absolute dollars are small because the mock prices tokens in sub-cents; the **92.1%** figure is the résumé-relevant claim (counterfactual would-be spend vs actual). Script asserts `API total == routing + cache` (no double-count) before printing.
+
 ## Live Vertex run — 2026-07-23 (real Gemini, local host)
 
 Same governance claims against a real `gemini-2.5-flash-lite` stream over Vertex AI (ADC auth,
