@@ -27,8 +27,8 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		// bump this when adding a migration; V14 added live-model price + validation policy (11.3)
-		assertThat(applied).isEqualTo(14);
+		// bump this when adding a migration; V15 added cache_hit_log (1.3 / #93)
+		assertThat(applied).isEqualTo(15);
 		assertThat(failed).isZero();
 	}
 
