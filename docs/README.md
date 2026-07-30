@@ -287,6 +287,12 @@ One command runs the whole benchmark: stack up, budgets seeded, three k6 scenari
 bash loadtest/run.sh
 ```
 
+Cost-savings benchmark (routing + semantic cache, also $0 mock):
+
+```bash
+bash loadtest/run-savings.sh
+```
+
 The scenarios are a 130 second warm soak at 30 req/s, then 100 req/s sustained for 30 seconds across 10 governed teams to measure guard latency, then 300 requests flooding 10 teams with tiny caps to test for overspend, then 10 concurrent long streams against cutoff sized caps to measure cutoff accuracy.
 
 Guard quantiles are read from Prometheus at the measurement window, so the decaying summary cannot dilute them with cold start samples. Full results, the live Gemini run, and caveats: [BENCHMARK.md](../BENCHMARK.md).

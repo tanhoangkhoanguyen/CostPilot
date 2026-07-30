@@ -190,7 +190,7 @@
     <div class="card kpi"><span class="label">Requests</span><span class="value" id="k-req">-</span><span class="cap" id="k-req-cap">governed</span></div>
     <div class="card kpi"><span class="label">Mid-stream cutoffs</span><span class="value" id="k-cut">-</span><span class="cap" id="k-cut-cap">budget-killed in flight</span></div>
     <div class="card kpi"><span class="label">Downgrades + routes</span><span class="value" id="k-dr">-</span><span class="cap" id="k-dr-cap">cost actions taken</span></div>
-    <div class="card kpi"><span class="label">Routing savings</span><span class="value" id="k-sav" style="color:var(--good)">-</span><span class="cap" id="k-sav-cap">vs requested models</span></div>
+    <div class="card kpi"><span class="label">Cost savings</span><span class="value" id="k-sav" style="color:var(--good)">-</span><span class="cap" id="k-sav-cap">routing + cache</span></div>
     <div class="card kpi"><span class="label">Reconciliation</span><span class="value small" id="k-rec"><span class="reconcile-badge">-</span></span><span class="cap" id="k-rec-cap">ledger vs OLAP</span></div>
   </section>
 
@@ -323,7 +323,7 @@
       {scopeRef:"support",limitUsd:null,spentUsd:"38.21",utilization:null},
     ],
     reconcile:{postgresRows:40892, clickhouseRows:40892, postgresNanos:427152300000, clickhouseNanos:427152300000, reconciled:true},
-    savings:{routingSavingsUsd:"52.8317", actualSpendUsd:"427.19", wouldBeSpendUsd:"480.02"},
+    savings:{routingSavingsUsd:"42.8317", cacheSavingsUsd:"10.0000", totalSavingsUsd:"52.8317", actualSpendUsd:"427.19", wouldBeSpendUsd:"480.02", percentSaved:11.0},
   };
 
   // ---------- fetch ----------
@@ -362,11 +362,14 @@
     document.getElementById("k-dr-cap").innerHTML = `<b>${nf.format(dec.downgrade||0)}</b> downgrade &middot; <b>${nf.format(dec.route||0)}</b> route`;
 
     const sv = d.savings || {};
-    document.getElementById("k-sav").textContent = money(sv.routingSavingsUsd || 0);
-    const wb = toNum(sv.wouldBeSpendUsd), pct = wb>0 ? ((wb - toNum(sv.actualSpendUsd))/wb*100) : 0;
-    document.getElementById("k-sav-cap").innerHTML = pct>0
-      ? `<b>${pct.toFixed(1)}%</b> off would-be ${money(wb)}`
-      : "vs requested models";
+    document.getElementById("k-sav").textContent = money(sv.totalSavingsUsd || sv.routingSavingsUsd || 0);
+    const wb = toNum(sv.wouldBeSpendUsd);
+    const pct = sv.percentSaved != null ? Number(sv.percentSaved)
+      : (wb > 0 ? ((wb - toNum(sv.actualSpendUsd)) / wb * 100) : 0);
+    const route = money(sv.routingSavingsUsd || 0), cache = money(sv.cacheSavingsUsd || 0);
+    document.getElementById("k-sav-cap").innerHTML = pct > 0
+      ? `<b>${pct.toFixed(1)}%</b> off would-be ${money(wb)} · route ${route} · cache ${cache}`
+      : "routing + cache";
 
     const rc = d.reconcile, el = document.getElementById("k-rec");
     const ok = rc.reconciled;

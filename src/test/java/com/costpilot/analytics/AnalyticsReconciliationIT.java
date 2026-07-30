@@ -66,6 +66,12 @@ class AnalyticsReconciliationIT {
 	@Autowired
 	private com.costpilot.domain.UsageRecordRepository usageRepository;
 
+	@Autowired
+	private com.costpilot.cache.CacheHitLogRepository cacheHitLog;
+
+	@Autowired
+	private javax.sql.DataSource dataSource;
+
 	private final Instant t0 = Instant.now().minus(1, ChronoUnit.HOURS);
 	private final Instant t1 = Instant.now().plus(1, ChronoUnit.HOURS);
 
@@ -88,6 +94,8 @@ class AnalyticsReconciliationIT {
 				order by (team_id, project_id, event_ts, event_id)
 				""");
 		clickhouseJdbc.execute("truncate table if exists costpilot.usage_events");
+		// wipe cache_hit_log so /savings is deterministic across tests
+		new JdbcTemplate(dataSource).update("delete from cache_hit_log");
 	}
 
 	// insert a ledger row (Postgres) and a matching ClickHouse event with the same cost
@@ -124,8 +132,8 @@ class AnalyticsReconciliationIT {
 		assertThat(result.clickhouseNanos()).isEqualTo(10_000_000L);
 	}
 
-	// 7.3: /savings sums usage_record.savings_nanos (Postgres money truth) over the window;
-	// wouldBeSpend = actual executed spend + savings. Only rows WITH savings contribute.
+	// 7.3 / 1.3: /savings sums routing (usage_record.savings_nanos) + cache (cache_hit_log)
+	// over the window; wouldBeSpend = actual + routing + cache; percentSaved = total/wouldBe.
 	@Test
 	void savingsSummarySumsLedgerRoutingSavings() {
 		String team = "sav-" + UUID.randomUUID();
@@ -140,8 +148,34 @@ class AnalyticsReconciliationIT {
 				SavingsSummary.class, t0.toString(), t1.toString()).getBody();
 
 		assertThat(s.routingSavingsUsd()).isEqualTo("0.003000000");
+		assertThat(s.cacheSavingsUsd()).isEqualTo("0.000000000");
+		assertThat(s.totalSavingsUsd()).isEqualTo("0.003000000");
 		assertThat(s.actualSpendUsd()).isEqualTo("0.010000000");
 		assertThat(s.wouldBeSpendUsd()).isEqualTo("0.013000000");
+		assertThat(s.percentSaved()).isEqualTo(23.1);
+	}
+
+	// 1.3 (#93): cache_hit_log savings combine with routing; channels counted once each.
+	@Test
+	void savingsSummaryIncludesCacheHitLogWithoutDoubleCounting() {
+		String team = "sav-cache-" + UUID.randomUUID();
+		seedWithSavings(team, 5_000_000L, 1_000_000L); // routing 1m
+		cacheHitLog.record(null, team, 2_000_000L); // cache 2m
+		cacheHitLog.record(null, team, 1_000_000L); // cache +1m = 3m cache
+
+		SavingsSummary s = restTemplate.exchange(
+				"/api/analytics/savings?from={f}&to={t}",
+				org.springframework.http.HttpMethod.GET,
+				new org.springframework.http.HttpEntity<>(com.costpilot.security.AuthTestSupport.admin()),
+				SavingsSummary.class, t0.toString(), t1.toString()).getBody();
+
+		assertThat(s.routingSavingsUsd()).isEqualTo("0.001000000");
+		assertThat(s.cacheSavingsUsd()).isEqualTo("0.003000000");
+		assertThat(s.totalSavingsUsd()).isEqualTo("0.004000000");
+		assertThat(s.actualSpendUsd()).isEqualTo("0.005000000");
+		assertThat(s.wouldBeSpendUsd()).isEqualTo("0.009000000");
+		// 4m / 9m * 100 = 44.4
+		assertThat(s.percentSaved()).isEqualTo(44.4);
 	}
 
 	private void seedWithSavings(String team, long costNanos, long savingsNanos) {

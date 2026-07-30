@@ -34,6 +34,9 @@ class SemanticCacheIT {
 	@Autowired
 	private UsageRecordRepository usageRepository;
 
+	@Autowired
+	private CacheHitLogRepository cacheHitLog;
+
 	private ResponseEntity<String> chat(String team, String prompt) {
 		HttpHeaders h = new HttpHeaders();
 		h.setBearerAuth(AuthTestSupport.ADMIN_KEY);
@@ -65,6 +68,10 @@ class SemanticCacheIT {
 		assertThat(teamRows(team)).isEqualTo(afterFirst);
 		// the cached answer is returned verbatim
 		assertThat(second.getBody()).contains("chat.completion");
+		// 1.3: hit writes cache_hit_log (positive would-be cost), not usage_record.savings_nanos
+		java.time.Instant from = java.time.Instant.now().minus(1, java.time.temporal.ChronoUnit.HOURS);
+		java.time.Instant to = java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.HOURS);
+		assertThat(cacheHitLog.totalSavingsNanosForTeamBetween(team, from, to)).isPositive();
 	}
 
 	@Test
