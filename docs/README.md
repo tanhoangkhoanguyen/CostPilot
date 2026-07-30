@@ -297,6 +297,8 @@ The scenarios are a 130 second warm soak at 30 req/s, then 100 req/s sustained f
 
 Guard quantiles are read from Prometheus at the measurement window, so the decaying summary cannot dilute them with cold start samples. Full results, the live Gemini run, and caveats: [BENCHMARK.md](../BENCHMARK.md).
 
+**Billing vs estimate.** The ledger charge is exact (provider tokens × published price). The pre-flight reservation and mid-stream cutoff meter are the only heuristics — both are superseded when the provider reports usage. See [Money correctness](../BENCHMARK.md#money-correctness--exact-billing-vs-heuristics).
+
 ---
 
 ## 9. Development

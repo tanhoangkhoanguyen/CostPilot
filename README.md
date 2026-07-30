@@ -80,11 +80,13 @@ Ten steps. Everything the request touches lights up as it goes.
 | 3 | **Policy** | allow, deny, quietly downgrade, or hold for a human |
 | 4 | **Cache** | close enough to something already answered, serve it for free |
 | 5 | **Route** | cheapest model that still clears the bar you asked for |
-| 6 | **Budget** | reserve the worst case cost across every scope that governs you |
+| 6 | **Budget** | reserve a *conservative hold* (heuristic max cost) across every scope that governs you — not the bill |
 | 7 | **Forward** | out to OpenAI, Anthropic, Gemini, or the built in mock |
-| 8 | **Meter** | count the money as it streams, cut off cleanly on breach |
-| 9 | **Ledger** | write the real charge, once, even if you hang up |
-| 10 | **Settle** | release, publish, and leave an audit row explaining the verdict |
+| 8 | **Meter** | estimate running cost to cut off mid-stream; provider token count wins the instant it arrives |
+| 9 | **Ledger** | write the **exact** charge from provider-reported tokens × published price, once, even if you hang up |
+| 10 | **Settle** | release the hold, publish, and leave an audit row explaining the verdict |
+
+Exact billing vs the two heuristic sites (reserve, cutoff): [BENCHMARK.md — Money correctness](BENCHMARK.md#money-correctness--exact-billing-vs-heuristics).
 
 ## Quickstart
 

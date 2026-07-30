@@ -9,6 +9,24 @@ for latency, read from **Prometheus** at the measurement window. k6's own number
 as noisy context. Reproduce with `bash loadtest/run.sh` (mock upstream, $0) or
 `bash loadtest/run-live.sh` (real Gemini/Vertex, a few cents).
 
+## Money correctness — exact billing vs heuristics
+
+CostPilot does **not** "estimate the bill." The ledger charge is exact. Heuristics exist in
+exactly two places — and only while the true token count cannot yet exist. The moment the
+provider reports usage, that count **supersedes** the estimate.
+
+| mechanism | kind | role | source of truth |
+|---|---|---|---|
+| **Ledger charge** (`CostCalculator`) | **Authoritative exact** `BigDecimal` | Final billed amount on `usage_record` | Provider-reported tokens × versioned `model_price` (`rate/1k × tokens / 1000`, no rounding; integer nanodollars only at the Redis/event boundary) |
+| **Budget reservation** (`CostEstimator` via `BudgetGuard`) | Deterministic heuristic (**conservative hold**) | Pre-flight Redis hold so a flood cannot overspend | `chars/3` input + full `max_tokens` (default 1024) output — **not billing**; released on settle |
+| **Mid-stream meter** (`StreamCostMeter`) | Heuristic **until** provider usage arrives | Cutoff decision while tokens stream | Script-weighted length estimate; `StreamCostMeter.usage()` returns provider tokens when `reported > 0` — that is what the ledger writes |
+| **Published rates** (`model_price`) | Authoritative **for CostPilot** | Pricing input | Postgres Flyway seeds — **not** the cloud invoice |
+
+**GCP / invoice caveat.** Price-correctness claims are verified against provider-reported token
+counts × the published per-token price on the ledger — **not** reconciled against the GCP
+(or OpenAI/Anthropic) invoice. Sub-cent charges are often rounded or absorbed by free-trial
+credit and never surface as a line item.
+
 ## Headline — mid-stream budget cutoff
 
 A streamed response that passes admission but overruns mid-generation is **cut off the instant
@@ -30,7 +48,7 @@ honest, provider-dependent result.
 |---|---|---|
 | Teams overspending their cap under concurrent flood | **0** — mock 0/30, live Vertex breach=false | ledger |
 | Budget-guard decision latency, p99 (mock, 100 req/s sustained) | **14.123008 ms** | Prometheus |
-| Price correctness | billed = provider-reported tokens × published price (exact) | ledger |
+| Price correctness | billed = provider-reported tokens × published `model_price` (exact `BigDecimal`) | ledger — see [Money correctness](#money-correctness--exact-billing-vs-heuristics) |
 
 **Guard latency — measurement method.** Two-host run on identical VMs (both GCP `e2-standard-4`,
 4 vCPU / 16 GB, `us-central1-a`, Ubuntu 22.04): the gateway stack on one, the k6 load generator
@@ -85,10 +103,6 @@ subcommand per host:
 > (SSE-body detection is unreliable across the hop). That is a k6 false negative — the ledger is
 > authoritative and shows every `lt-cutoff-*` team billed to `cap + ~1.3 output tokens`
 > (one-chunk overshoot), i.e. the stream *was* cut off. Verify from Postgres, not k6's check line.
-
-**Price correctness caveat.** Verified against the provider's reported token counts × Google's
-published per-token price — **not** reconciled against the GCP invoice (sub-cent charges are
-rounded/absorbed by free-trial credit and never surfaced a line item).
 
 ## Cost savings — routing + semantic cache (mock, $0)
 
