@@ -10,6 +10,18 @@ spring:
     url: jdbc:postgresql://${COSTPILOT_DB_HOST:localhost}:${COSTPILOT_DB_PORT:5432}/${COSTPILOT_DB_NAME:costpilot}
     username: ${COSTPILOT_DB_USER:costpilot}
     password: ${COSTPILOT_DB_PASSWORD:costpilot}
+    hikari:
+      # Virtual threads (above) let the HTTP layer admit effectively unbounded
+      # concurrency, so the JDBC pool becomes the real ceiling. At Hikari's default
+      # of 10 the pool saturated at ~100 req/s and requests queued behind it: the
+      # guard's own timer then measured connection-wait, not the guard, and the
+      # e2e tail blew out to ~16s. Sized against Postgres max_connections=100 with
+      # room for a second app instance and psql/admin sessions.
+      maximum-pool-size: ${COSTPILOT_DB_POOL_MAX:40}
+      # kept well below the max on purpose: Hikari defaults minimumIdle to
+      # maximumPoolSize, and the test suite caches several Spring contexts that would
+      # then each pin 40 connections and blow past Postgres max_connections=100.
+      minimum-idle: ${COSTPILOT_DB_POOL_MIN:5}
   data:
     redis:
       host: ${COSTPILOT_REDIS_HOST:localhost}
@@ -54,6 +66,10 @@ costpilot:
     jdbc-url: jdbc:ch://${COSTPILOT_CLICKHOUSE_HOST:localhost}:${COSTPILOT_CLICKHOUSE_PORT:8123}/costpilot
     username: ${COSTPILOT_CLICKHOUSE_USER:default}
     password: ${COSTPILOT_CLICKHOUSE_PASSWORD:}
+  # Stage 10 / 1.3: semantic cache — opt-in spend reduction. Off by default.
+  cache:
+    enabled: ${COSTPILOT_CACHE_ENABLED:false}
+    similarity-threshold: ${COSTPILOT_CACHE_SIMILARITY_THRESHOLD:0.97}
   # Embedded mock LLM upstream - default upstream so dev + tests cost $0.
   mock-upstream:
     enabled: true
