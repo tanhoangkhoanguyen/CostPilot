@@ -1,5 +1,6 @@
 package com.costpilot.cache;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -41,6 +42,7 @@ public class SemanticCacheService {
 	private final ProviderRegistry registry;
 	private final boolean enabled;
 	private final double threshold;
+	private final Duration ttl;
 
 	public SemanticCacheService(PromptCacheRepository repository, CacheHitLogRepository hitLog,
 			Embedder embedder, GovernanceMetrics metrics, ObjectMapper objectMapper, CostService costService,
@@ -48,7 +50,11 @@ public class SemanticCacheService {
 			// off by default; a cost-optimization the org opts into. Conservative 0.97
 			// cosine threshold keeps the false-hit rate low (precision over recall).
 			@Value("${costpilot.cache.enabled:false}") boolean enabled,
-			@Value("${costpilot.cache.similarity-threshold:0.97}") double threshold) {
+			@Value("${costpilot.cache.similarity-threshold:0.97}") double threshold,
+			// 2.4 (#98): entry lifetime. A hit older than the TTL is never served (a
+			// semantic cache with no expiry serves unboundedly stale answers as "free");
+			// the eviction sweep deletes past-TTL rows on the same clock.
+			@Value("${costpilot.cache.ttl:PT24H}") Duration ttl) {
 		this.repository = repository;
 		this.hitLog = hitLog;
 		this.embedder = embedder;
@@ -58,6 +64,12 @@ public class SemanticCacheService {
 		this.registry = registry;
 		this.enabled = enabled;
 		this.threshold = threshold;
+		this.ttl = ttl;
+	}
+
+	/** 2.4 (#98): the TTL cutoff — entries created before this instant are stale. */
+	public Instant staleBefore() {
+		return Instant.now().minus(ttl);
 	}
 
 	public boolean enabled() {
@@ -74,7 +86,9 @@ public class SemanticCacheService {
 			return Optional.empty();
 		}
 		float[] embedding = embedder.embed(promptText(request));
-		Optional<Hit> hit = repository.nearest(ledger.tenantId(), ledger.teamId(), embedding);
+		// 2.4 (#98): exclude past-TTL rows from the match, so a stale entry is never served
+		// even in the window before the eviction sweep removes it.
+		Optional<Hit> hit = repository.nearest(ledger.tenantId(), ledger.teamId(), embedding, staleBefore());
 		if (hit.isEmpty() || hit.get().similarity() < threshold) {
 			metrics.cacheMiss();
 			log.debug("cache miss tenant={} team={} bestSimilarity={}",

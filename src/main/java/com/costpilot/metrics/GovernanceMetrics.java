@@ -105,6 +105,16 @@ public class GovernanceMetrics {
 		}
 	}
 
+	/**
+	 * 2.4 (#98): number of past-TTL semantic-cache entries deleted by the eviction sweep.
+	 * A monotonic counter - the dashboard reads its rate to confirm the cache is bounded.
+	 */
+	public void cacheEviction(int evicted) {
+		if (evicted > 0) {
+			registry.counter("costpilot.cache.evictions").increment(evicted);
+		}
+	}
+
 	public void recordTokens(long inputTokens, long outputTokens) {
 		registry.counter("costpilot.tokens", "direction", "input").increment(inputTokens);
 		registry.counter("costpilot.tokens", "direction", "output").increment(outputTokens);

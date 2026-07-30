@@ -70,6 +70,10 @@ costpilot:
   cache:
     enabled: ${COSTPILOT_CACHE_ENABLED:false}
     similarity-threshold: ${COSTPILOT_CACHE_SIMILARITY_THRESHOLD:0.97}
+    # 2.4 (#98): entry lifetime. A hit older than ttl is never served; the eviction
+    # sweep deletes past-ttl rows every eviction-interval-ms. ISO-8601 duration.
+    ttl: ${COSTPILOT_CACHE_TTL:PT24H}
+    eviction-interval-ms: ${COSTPILOT_CACHE_EVICTION_INTERVAL_MS:60000}
   # Embedded mock LLM upstream - default upstream so dev + tests cost $0.
   mock-upstream:
     enabled: true

@@ -61,6 +61,8 @@ Move the decision to where it matters: before the request leaves.
 
 **The meter keeps running while it streams.** An answer can run far longer than anyone estimated, so when the spend crosses the line the stream is cut clean, with a real `finish_reason` and a `[DONE]`. You pay for what arrived. The overshoot is one chunk.
 
+Estimates only ever place a temporary hold — a deliberate over-guess to reserve budget before the request leaves. Every dollar on the ledger is the exact provider-reported token count times the published price; the moment the provider's real number arrives, it replaces the guess.
+
 <img src="docs/Scene8.png" alt="A calm office, feet on the desk, a screen reading budget status safe, and the mascot giving a thumbs up">
 
 And it has to be invisible, or engineers will route around it. The whole check lands at 2.7 ms median under 100 requests per second.

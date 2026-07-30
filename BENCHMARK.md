@@ -32,6 +32,31 @@ honest, provider-dependent result.
 | Budget-guard decision latency, p99 (mock, 100 req/s sustained) | **14.123008 ms** | Prometheus |
 | Price correctness | billed = provider-reported tokens × published price (exact) | ledger |
 
+### What is exact vs what is a hold
+
+CostPilot bills **exactly**; it estimates **only** at the two points where the true token
+count does not exist yet — the pre-flight budget reservation and the mid-stream cutoff
+decision — and the provider's own count supersedes the estimate the instant it arrives. The
+money written to the ledger is never an estimate.
+
+| mechanism | kind | role | source of truth |
+|---|---|---|---|
+| **Ledger billing** — `CostCalculator.calculate` ([`CostCalculator.java:18-28`](src/main/java/com/costpilot/cost/CostCalculator.java#L18-L28)) | **authoritative** | what a team is actually charged | provider-reported tokens × versioned per-1k price, in `BigDecimal` nanodollars — `rate × tokens / 1000` only shifts the decimal, so **no rounding ever happens** |
+| **Pre-flight reservation** — `CostEstimator.estimateMax` ([`CostEstimator.java:22-38`](src/main/java/com/costpilot/cost/CostEstimator.java#L22-L38)) | deterministic heuristic | a **hold** placed before the request is forwarded, so a concurrent flood can't overspend | deliberately *over*-estimates (input `chars/3`, output the full `max_tokens`); released and replaced by the exact charge once the provider reports |
+| **Mid-stream cutoff** — `StreamCostMeter.usage` ([`StreamCostMeter.java:74-84`](src/main/java/com/costpilot/cost/StreamCostMeter.java#L74-L84)) | deterministic heuristic | a running cost during the stream so an over-budget generation is cut off on time | script-weighted length estimate **only until** the provider's usage arrives; `reportedOutputTokens > 0` ⇒ the reported count is returned instead |
+
+**The estimate never becomes the bill.** Both estimate sites exist because most providers
+report token usage only at the *end* of a stream — until then the true number physically
+does not exist. `StreamCostMeter.usage()` returns the provider's reported count the instant
+it is present (`reportedOutputTokens.get() > 0`), so the ledger always settles on the exact
+provider-reported figure. The one documented exception is a stream cut off *before* any usage
+event arrived: it is billed on the estimated tokens (a partial record), because there is no
+authoritative number to use.
+
+*Price-correctness caveat: "exact" means exact against the **provider's reported token counts ×
+the published per-token price** — not reconciled against the GCP invoice line, whose sub-cent
+charges are rounded/absorbed by free-trial credit and never surface individually.*
+
 **Guard latency — measurement method.** Two-host run on identical VMs (both GCP `e2-standard-4`,
 4 vCPU / 16 GB, `us-central1-a`, Ubuntu 22.04): the gateway stack on one, the k6 load generator
 on a *separate* VM in the same zone, so the generator can't steal CPU from the JVM recording the

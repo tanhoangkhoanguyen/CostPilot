@@ -205,6 +205,7 @@ When an incoming prompt is close enough to one already answered, CostPilot serve
 - **How it decides.** Prompts are embedded by a deterministic local embedder, which means dev and tests make no network call and cost nothing, and stored in pgvector keyed by tenant and team. A lookup takes the nearest neighbour **inside the same tenant and team**, so tenants can never read each other's cache. The `Embedder` interface is the single place to swap in a real embedding provider.
 - **Precision over recall.** A hit needs cosine similarity of at least **0.97** (`COSTPILOT_CACHE_SIMILARITY_THRESHOLD`). The threshold is deliberately strict: the cache would rather forward a borderline prompt than return a wrong answer. A hit sets `X-CostPilot-Cache: hit`.
 - **Savings.** Every hit accrues `costpilot.cache.savings_nanos`. Grafana shows savings, hit ratio and hit/miss rate, and the figure reconciles against the hit log.
+- **Lifetime is bounded.** An entry older than the TTL (`COSTPILOT_CACHE_TTL`, default `PT24H`) is never served — the lookup excludes past-TTL rows — and a scheduled sweep (`COSTPILOT_CACHE_EVICTION_INTERVAL_MS`, default 60s) deletes them so the table stays bounded. A semantic cache with no expiry would serve unboundedly stale answers as "free" and grow without limit; every other cache in the system already has a TTL, and now this one does too. Evictions are counted at `costpilot.cache.evictions` and the live entry count is the `costpilot.cache.size` gauge.
 
 Streaming requests skip the cache, because a cached answer is a complete response.
 

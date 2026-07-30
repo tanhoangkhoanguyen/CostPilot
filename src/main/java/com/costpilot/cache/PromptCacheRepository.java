@@ -1,5 +1,7 @@
 package com.costpilot.cache;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,22 +47,43 @@ public class PromptCacheRepository {
 	 * Nearest neighbor within the same tenant/team, as (response, similarity). Cosine
 	 * distance operator `&lt;=&gt;` returns 1 - cosine similarity; similarity = 1 - distance.
 	 * Returns empty when the cache holds nothing for this scope.
+	 *
+	 * <p>2.4 (#98): {@code staleBefore} excludes past-TTL rows (created_at &lt; staleBefore)
+	 * from the match, so an expired entry is never served even before the eviction sweep
+	 * deletes it. The created_at predicate is index-backed (V16).
 	 */
-	public Optional<Hit> nearest(String tenantId, String teamId, float[] embedding) {
+	public Optional<Hit> nearest(String tenantId, String teamId, float[] embedding, Instant staleBefore) {
 		List<Hit> hits = jdbc.query("""
 				select model, response, input_tokens, output_tokens, cost_nanos,
 				       1 - (embedding <=> ?::vector) as similarity
 				from prompt_cache
 				where tenant_id is not distinct from ?
 				  and team_id  is not distinct from ?
+				  and created_at >= ?
 				order by embedding <=> ?::vector
 				limit 1
 				""",
 				(rs, i) -> new Hit(rs.getString("model"), rs.getString("response"),
 						rs.getInt("input_tokens"), rs.getInt("output_tokens"),
 						rs.getLong("cost_nanos"), rs.getDouble("similarity")),
-				toVectorLiteral(embedding), tenantId, teamId, toVectorLiteral(embedding));
+				toVectorLiteral(embedding), tenantId, teamId, Timestamp.from(staleBefore),
+				toVectorLiteral(embedding));
 		return hits.stream().findFirst();
+	}
+
+	/**
+	 * 2.4 (#98): delete every entry older than the cutoff (created_at &lt; cutoff). The
+	 * eviction sweep calls this with cutoff = now − ttl. Returns the number of rows
+	 * removed so the caller can record it as an evictions metric.
+	 */
+	public int deleteExpired(Instant cutoff) {
+		return jdbc.update("delete from prompt_cache where created_at < ?", Timestamp.from(cutoff));
+	}
+
+	/** Current number of cached entries — backs the cache-size gauge and eviction tests. */
+	public long count() {
+		Long n = jdbc.queryForObject("select count(*) from prompt_cache", Long.class);
+		return n == null ? 0L : n;
 	}
 
 	static String toVectorLiteral(float[] embedding) {
