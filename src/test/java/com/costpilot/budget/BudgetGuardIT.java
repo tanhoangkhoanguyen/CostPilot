@@ -73,6 +73,9 @@ class BudgetGuardIT {
 	@Autowired
 	private ProviderRegistry registry;
 
+	@Autowired
+	private com.costpilot.metrics.GovernanceMetrics metrics;
+
 	private static final String BODY = """
 			{
 			  "model": "gpt-4o-mini",
@@ -170,7 +173,7 @@ class BudgetGuardIT {
 		StringRedisTemplate deadTemplate = new StringRedisTemplate(factory);
 		try {
 			BudgetGuard deadGuard = new BudgetGuard(deadTemplate,
-					budgetService, budgets, estimator, priceLookup, registry);
+					budgetService, budgets, estimator, priceLookup, registry, metrics);
 
 			String team = newTeamWithBudget("0.00001"); // would hard-block if redis were up
 			CanonicalChatRequest request = new CanonicalChatRequest("gpt-4o-mini",

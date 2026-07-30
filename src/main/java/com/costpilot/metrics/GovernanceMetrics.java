@@ -114,6 +114,28 @@ public class GovernanceMetrics {
 		budgetGuard.record(nanos, TimeUnit.NANOSECONDS);
 	}
 
+	/**
+	 * The guard total (above) splits into two phases, timed separately so the p99 tail can be
+	 * attributed: the price lookup (30s-cached, falls through to Postgres on a miss) and the
+	 * Redis Lua reservation across scopes. outcome=hit|miss (bounded) isolates the DB-hit cost.
+	 */
+	public void recordGuardPriceLookup(long nanos, boolean cacheHit) {
+		Timer.builder("costpilot.budget.guard.price_lookup")
+				.description("guard price-lookup phase (cache hit vs Postgres fall-through)")
+				.tag("outcome", cacheHit ? "hit" : "miss")
+				.publishPercentiles(0.5, 0.95, 0.99)
+				.register(registry)
+				.record(nanos, TimeUnit.NANOSECONDS);
+	}
+
+	public void recordGuardReserve(long nanos) {
+		Timer.builder("costpilot.budget.guard.reserve")
+				.description("guard Redis Lua reservation phase across governed scopes")
+				.publishPercentiles(0.5, 0.95, 0.99)
+				.register(registry)
+				.record(nanos, TimeUnit.NANOSECONDS);
+	}
+
 	/** upstream forwarding latency, tagged by provider (bounded set of adapters). */
 	public void recordUpstreamLatency(String provider, long nanos) {
 		Timer.builder("costpilot.upstream")

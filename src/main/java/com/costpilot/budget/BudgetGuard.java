@@ -21,6 +21,7 @@ import com.costpilot.cost.PriceLookupService;
 import com.costpilot.cost.PriceNotFoundException;
 import com.costpilot.domain.BudgetRepository;
 import com.costpilot.domain.ModelPrice;
+import com.costpilot.metrics.GovernanceMetrics;
 import com.costpilot.provider.ProviderRegistry;
 
 /**
@@ -71,15 +72,18 @@ public class BudgetGuard {
 	private final CostEstimator estimator;
 	private final PriceLookupService priceLookup;
 	private final ProviderRegistry registry;
+	private final GovernanceMetrics metrics;
 
 	public BudgetGuard(StringRedisTemplate redis, BudgetService budgetService, BudgetRepository budgets,
-			CostEstimator estimator, PriceLookupService priceLookup, ProviderRegistry registry) {
+			CostEstimator estimator, PriceLookupService priceLookup, ProviderRegistry registry,
+			GovernanceMetrics metrics) {
 		this.redis = redis;
 		this.budgetService = budgetService;
 		this.budgets = budgets;
 		this.estimator = estimator;
 		this.priceLookup = priceLookup;
 		this.registry = registry;
+		this.metrics = metrics;
 	}
 
 	/**
@@ -89,18 +93,25 @@ public class BudgetGuard {
 	 */
 	public GuardResult reserve(CanonicalChatRequest request, LedgerContext context) {
 		try {
+			// phase 1: price lookup (30s-cached, Postgres on a miss) - the p99 tail suspect
 			long reserveNanos = BudgetService.toNanos(estimate(request));
+			// phase 2: the Redis Lua reservation across every governed scope - the p50 path
+			long reserveStart = System.nanoTime();
 			List<Reservation> held = new ArrayList<>();
 			String warning = null;
-			for (BudgetScope scope : BudgetScope.values()) {
-				String ref = refFor(scope, request, context);
-				if (ref == null || ref.isBlank()) {
-					continue;
+			try {
+				for (BudgetScope scope : BudgetScope.values()) {
+					String ref = refFor(scope, request, context);
+					if (ref == null || ref.isBlank()) {
+						continue;
+					}
+					Long status = tryReserve(scope, ref, reserveNanos, held);
+					if (status != null && status == 2) {
+						warning = scope.dbValue() + "=" + ref + " budget below 20% remaining";
+					}
 				}
-				Long status = tryReserve(scope, ref, reserveNanos, held);
-				if (status != null && status == 2) {
-					warning = scope.dbValue() + "=" + ref + " budget below 20% remaining";
-				}
+			} finally {
+				metrics.recordGuardReserve(System.nanoTime() - reserveStart);
 			}
 			return new GuardResult(held, warning, false);
 		} catch (BudgetExceededException e) {
@@ -187,12 +198,16 @@ public class BudgetGuard {
 			new java.util.concurrent.ConcurrentHashMap<>();
 
 	private BigDecimal estimate(CanonicalChatRequest request) {
+		long lookupStart = System.nanoTime();
 		long now = System.currentTimeMillis();
 		CachedPrice cached = priceCache.get(request.model());
-		if (cached == null || now - cached.cachedAt() > PRICE_CACHE_TTL_MS) {
+		boolean cacheHit = cached != null && now - cached.cachedAt() <= PRICE_CACHE_TTL_MS;
+		if (!cacheHit) {
+			// miss: fall through to the priced-lookup path (Postgres) and refresh the cache
 			cached = new CachedPrice(lookupPrice(request.model()), now);
 			priceCache.put(request.model(), cached);
 		}
+		metrics.recordGuardPriceLookup(System.nanoTime() - lookupStart, cacheHit);
 		if (cached.price() == null) {
 			// unpriced model: nothing to reserve, but existing counters still gate
 			return BigDecimal.ZERO;

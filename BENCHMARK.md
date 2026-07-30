@@ -29,14 +29,29 @@ honest, provider-dependent result.
 | claim | result | source |
 |---|---|---|
 | Teams overspending their cap under concurrent flood | **0** — mock 0/30, live Vertex breach=false | ledger |
-| Budget-guard decision overhead (mock, 100 req/s) | p50 **2.72 ms** / p95 **7.57 ms** | Prometheus |
+| Budget-guard decision latency (mock, 100 req/s sustained) | p50 **4.947968 ms** / p95 **29.32736 ms** / p99 **44.007424 ms** | Prometheus |
 | Price correctness | billed = provider-reported tokens × published price (exact) | ledger |
 
-**Guard p99 (<5 ms target): pending.** The last mock run measured p99 **17.79 ms** on a
-cold-build, shared laptop (whole stack + load generator on one host) — a measurement-noise
-figure, not the guard logic. p50/p95 are in line with steady state; a clean warm-host re-run is
-needed before publishing a p99. Guard latency is computed *before* the upstream call, so it is
-provider-independent — a live run adds nothing here.
+**Guard latency — measurement method + honest tail.** Two-host run: the gateway stack on one
+VM, the k6 load generator on a *separate* VM, so the generator can't steal CPU from the JVM
+recording the latency. 100 req/s was sustained through the measured window (confirmed from
+Prometheus, `rate(costpilot_budget_guard_seconds_count[15s]) ≈ 100`). Quantiles are read from
+Prometheus at the window tail (`max_over_time(costpilot_budget_guard_seconds{quantile}[15s])`),
+not from k6's client-side round-trip — those are measured server-side around `BudgetGuard.reserve`
+(`GovernedRequestExecutor.java:100-124`), so the client→gateway network hop is outside the span.
+
+- **p50 4.947968 ms** is the warm path: pure Redis Lua reservation across the governed scopes.
+- **p99 44.007424 ms** is the tail: `reserve()` also does the model **price lookup**, cached for 30 s
+  (`BudgetGuard.java:181-201`). On a cache miss it falls through to Postgres; the first requests
+  after each expiry (and after a fresh counter rebuild) pay that DB hit. The tail is the
+  price-cache/counter-rebuild path, **not** the Redis reservation.
+
+*Single-instance, client-side summary quantiles (`GovernanceMetrics.java:42-45`) — not aggregated
+across instances (no load balancer, by design; aggregating summary quantiles would be invalid).*
+
+> Supersedes an earlier **17.79 ms** figure that was measured with the generator co-located with
+> the stack on one laptop — CPU contention made it noise, not a defensible number. The figures
+> above are larger but reproducible and explainable; that trade is deliberate.
 
 **Price correctness caveat.** Verified against the provider's reported token counts × Google's
 published per-token price — **not** reconciled against the GCP invoice (sub-cent charges are
