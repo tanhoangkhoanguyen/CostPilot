@@ -68,7 +68,7 @@ const ALL = {
 	},
 	// concurrent long streams that pass admission but overrun mid-generation → forces a
 	// mid-stream budget_cutoff. Gemini emits multi-token chunks, so the ledger overshoot
-	// is bounded by ~one chunk's tokens (documented honestly in BENCHMARK.md), not the
+	// is bounded by ~one chunk's tokens (documented honestly in docs/BENCHMARK.md), not the
 	// mock's 0.33.
 	cutoff: {
 		cutoff_scale: {

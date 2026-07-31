@@ -19,7 +19,7 @@ Measured the honest way: generator isolated on a **separate host** (no CPU conte
 JVM under test), 100 req/s sustained through the window, quantiles read from Prometheus — not
 from the load generator's client-side timings.
 
-→ Full method, per-phase analysis, and reproduction steps: [`../BENCHMARK.md`](../BENCHMARK.md).
+→ Full method, per-phase analysis, and reproduction steps: [`../docs/BENCHMARK.md`](../docs/BENCHMARK.md).
 
 ---
 

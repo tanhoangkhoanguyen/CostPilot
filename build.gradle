@@ -71,6 +71,14 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 	finalizedBy 'jacocoTestReport'
+	// surface the failing test name in CI logs without dumping every passing case
+	testLogging {
+		events 'failed', 'skipped'
+		exceptionFormat 'full'
+		showExceptions true
+		showCauses true
+		showStackTraces true
+	}
 }
 
 jacoco {

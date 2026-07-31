@@ -18,7 +18,7 @@
 <img height="56" alt="ClickHouse" src="https://cdn.simpleicons.org/clickhouse/EFB100">
 </p>
 
-<a href="docs/README.md"><b>Setup and usage docs</b></a> · <a href="ROADMAP.md">Roadmap</a>
+<a href="docs/README.md"><b>Setup and usage docs</b></a> · <a href="docs/BENCHMARK.md"><b>Benchmarks</b></a>
 
 </div>
 

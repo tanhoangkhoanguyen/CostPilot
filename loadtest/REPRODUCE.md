@@ -20,7 +20,7 @@ GCP-style layout, but nothing here is cloud-specific beyond the firewall UI.
 | **VM-A** | gateway stack | **≥ 4 vCPU**, Ubuntu 22.04 | six containers (gateway, postgres, redis, kafka, clickhouse, prometheus); fewer cores and they contend, reintroducing the noise you're removing |
 | **VM-B** | k6 generator | same as VM-A | driving 100 rps of tiny requests is light, so VM-B is over-provisioned here — matching VM-A's spec just keeps it simple and rules out the generator as a bottleneck |
 
-> The published figures in `BENCHMARK.md` were measured with **both VMs = GCP `e2-standard-4`
+> The published figures in `docs/BENCHMARK.md` were measured with **both VMs = GCP `e2-standard-4`
 > (4 vCPU / 16 GB), `us-central1-a`, Ubuntu 22.04** (identical spec, different name). Record your
 > own VM-A spec next to any number you publish — the guard latency is a single-process
 > measurement and the host matters.
@@ -193,4 +193,4 @@ shared cloud infra carry real variance (noisy neighbors, GC, JVM warmup). If two
 more than that, the isolation or window isn't clean; investigate rather than averaging two bad
 runs.
 
-The measured figures and what they show are in [`../BENCHMARK.md`](../BENCHMARK.md).
+The measured figures and what they show are in [`../docs/BENCHMARK.md`](../docs/BENCHMARK.md).

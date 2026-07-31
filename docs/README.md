@@ -4,7 +4,7 @@
 
 Everything you need to run it, drive it, and point it at a real provider.
 
-[← Back to the project](../README.md) · [Roadmap](../ROADMAP.md) · [Benchmarks](../BENCHMARK.md)
+[← Back to the project](../README.md) · [Benchmarks](BENCHMARK.md)
 
 </div>
 
@@ -296,7 +296,7 @@ bash loadtest/run-savings.sh
 
 The scenarios are a 130 second warm soak at 30 req/s, then 100 req/s sustained for 30 seconds across 10 governed teams to measure guard latency, then 300 requests flooding 10 teams with tiny caps to test for overspend, then 10 concurrent long streams against cutoff sized caps to measure cutoff accuracy.
 
-Guard quantiles are read from Prometheus at the measurement window, so the decaying summary cannot dilute them with cold start samples. Full results, the live Gemini run, and caveats: [BENCHMARK.md](../BENCHMARK.md).
+Guard quantiles are read from Prometheus at the measurement window, so the decaying summary cannot dilute them with cold start samples. Full results, the live Gemini run, and caveats: [BENCHMARK.md](BENCHMARK.md).
 
 ---
 
@@ -313,5 +313,3 @@ Guard quantiles are read from Prometheus at the measurement window, so the decay
 - 170+ tests run against the embedded mock upstream. Coverage gate: line 80%, branch 60%.
 - CI runs the same build on every push and pull request.
 - The build has two modules: the gateway at the root, and `cli/`, which is standalone and deliberately excluded from the coverage gate and the Docker image.
-
-Design decisions and the full issue by issue plan: [ROADMAP.md](../ROADMAP.md).

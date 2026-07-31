@@ -41,9 +41,9 @@ money written to the ledger is never an estimate.
 
 | mechanism | kind | role | source of truth |
 |---|---|---|---|
-| **Ledger billing** — `CostCalculator.calculate` ([`CostCalculator.java:18-28`](src/main/java/com/costpilot/cost/CostCalculator.java#L18-L28)) | **authoritative** | what a team is actually charged | provider-reported tokens × versioned per-1k price, in `BigDecimal` nanodollars — `rate × tokens / 1000` only shifts the decimal, so **no rounding ever happens** |
-| **Pre-flight reservation** — `CostEstimator.estimateMax` ([`CostEstimator.java:22-38`](src/main/java/com/costpilot/cost/CostEstimator.java#L22-L38)) | deterministic heuristic | a **hold** placed before the request is forwarded, so a concurrent flood can't overspend | deliberately *over*-estimates (input `chars/3`, output the full `max_tokens`); released and replaced by the exact charge once the provider reports |
-| **Mid-stream cutoff** — `StreamCostMeter.usage` ([`StreamCostMeter.java:74-84`](src/main/java/com/costpilot/cost/StreamCostMeter.java#L74-L84)) | deterministic heuristic | a running cost during the stream so an over-budget generation is cut off on time | script-weighted length estimate **only until** the provider's usage arrives; `reportedOutputTokens > 0` ⇒ the reported count is returned instead |
+| **Ledger billing** — `CostCalculator.calculate` ([`CostCalculator.java:18-28`](../src/main/java/com/costpilot/cost/CostCalculator.java#L18-L28)) | **authoritative** | what a team is actually charged | provider-reported tokens × versioned per-1k price, in `BigDecimal` nanodollars — `rate × tokens / 1000` only shifts the decimal, so **no rounding ever happens** |
+| **Pre-flight reservation** — `CostEstimator.estimateMax` ([`CostEstimator.java:22-38`](../src/main/java/com/costpilot/cost/CostEstimator.java#L22-L38)) | deterministic heuristic | a **hold** placed before the request is forwarded, so a concurrent flood can't overspend | deliberately *over*-estimates (input `chars/3`, output the full `max_tokens`); released and replaced by the exact charge once the provider reports |
+| **Mid-stream cutoff** — `StreamCostMeter.usage` ([`StreamCostMeter.java:74-84`](../src/main/java/com/costpilot/cost/StreamCostMeter.java#L74-L84)) | deterministic heuristic | a running cost during the stream so an over-budget generation is cut off on time | script-weighted length estimate **only until** the provider's usage arrives; `reportedOutputTokens > 0` ⇒ the reported count is returned instead |
 
 **The estimate never becomes the bill.** Both estimate sites exist because most providers
 report token usage only at the *end* of a stream — until then the true number physically
@@ -96,8 +96,8 @@ no load balancer). `reserve` and `total` fall in the same summary bucket at this
 ### Reproducing the guard-latency benchmark
 
 The benchmark spans two hosts. The full start→end runbook — provision two VMs, open the
-firewall, run, and scrape — is [`loadtest/REPRODUCE.md`](loadtest/REPRODUCE.md); its mechanical
-steps are wrapped in [`loadtest/guard-benchmark.sh`](loadtest/guard-benchmark.sh), one
+firewall, run, and scrape — is [`loadtest/REPRODUCE.md`](../loadtest/REPRODUCE.md); its mechanical
+steps are wrapped in [`loadtest/guard-benchmark.sh`](../loadtest/guard-benchmark.sh), one
 subcommand per host:
 
 ```bash

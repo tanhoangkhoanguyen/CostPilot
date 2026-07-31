@@ -27,8 +27,8 @@ class MigrationAndSeedIT {
 				"select count(*) from flyway_schema_history where success = true", Integer.class);
 		Integer failed = jdbc.queryForObject(
 				"select count(*) from flyway_schema_history where success = false", Integer.class);
-		// bump this when adding a migration; V15 added cache_hit_log (1.3 / #93)
-		assertThat(applied).isEqualTo(15);
+		// bump this when adding a migration; V16 added prompt_cache created_at index (TTL eviction)
+		assertThat(applied).isEqualTo(16);
 		assertThat(failed).isZero();
 	}
 
