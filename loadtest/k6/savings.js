@@ -1,6 +1,6 @@
 // 1.3 (#93): $0-mock cost-savings scenario — routing downgrades + semantic cache hits.
 // Seeds lt-savings-* traffic, then run-savings.sh reconciles ledger + cache_hit_log
-// against GET /api/analytics/savings (and prints $ / % saved for BENCHMARK.md).
+// against GET /api/analytics/savings (and prints $ / % saved for docs/BENCHMARK.md).
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import exec from 'k6/execution';

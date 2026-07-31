@@ -3,7 +3,7 @@
 #   bash loadtest/run-savings.sh
 # Enables the semantic cache, drives downgrade-eligible + cache-hit traffic, then
 # reconciles routing (usage_record.savings_nanos) + cache (cache_hit_log) against
-# GET /api/analytics/savings and prints $ saved / % saved for BENCHMARK.md.
+# GET /api/analytics/savings and prints $ saved / % saved for docs/BENCHMARK.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
