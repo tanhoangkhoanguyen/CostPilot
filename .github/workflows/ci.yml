@@ -60,12 +60,17 @@ jobs:
           test ! -e BENCHMARK.md
           test -f loadtest/REPRODUCE.md
           test -f loadtest/guard-benchmark.sh
+          test -f loadtest/run.sh
+          test -f loadtest/run-savings.sh
           test -f src/main/java/com/costpilot/cost/CostCalculator.java
           test -f src/main/java/com/costpilot/cost/CostEstimator.java
           test -f src/main/java/com/costpilot/cost/StreamCostMeter.java
           # README must point at docs/BENCHMARK, not a root ROADMAP
           grep -q 'docs/BENCHMARK.md' README.md
-          ! grep -q 'ROADMAP.md' README.md docs/README.md
+          if grep -q 'ROADMAP.md' README.md docs/README.md; then
+            echo "::error::ROADMAP.md must not be linked from README/docs"
+            exit 1
+          fi
           echo "OK: docs layout"
 
   build:
