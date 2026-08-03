@@ -23,6 +23,16 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    # Two majors are blocked on each other and on a real migration, so proposing them
+    # weekly is pure noise. CI proved it rather than assumed it: PR #110 (Boot 4.1.0)
+    # failed build + image + vuln-scan, and PR #113 (Gradle 9.6.1) failed image,
+    # because the Boot 3.5 plugin is not Gradle 9 compatible. Lift both together when
+    # the Boot 4 migration is actually scheduled.
+    ignore:
+      - dependency-name: org.springframework.boot
+        update-types: [version-update:semver-major]
+      - dependency-name: gradle
+        update-types: [version-update:semver-major]
     groups:
       spring:
         patterns:
