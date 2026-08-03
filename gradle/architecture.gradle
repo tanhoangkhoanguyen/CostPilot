@@ -1,0 +1,147 @@
+// Package-level architecture guard.
+//
+// #100 dissolved the `domain` sink and split `cost` into pricing/metering/ledger/audit.
+// The thing that made `domain` painful was not its size, it was that every feature
+// pointed inward at it, so any change rippled. A one-off refactor does not prevent that
+// coming back - a build gate does. `packageCycles` fails the build if the com.costpilot.*
+// package graph contains a cycle.
+//
+// Source-level, not bytecode: it reads imports and fully qualified references straight
+// out of the .java files, so it needs no compiled classes and runs in well under a second.
+
+def COSTPILOT = 'com.costpilot'
+
+// com.costpilot.pricing.PriceLookupService -> com.costpilot.pricing
+// Matches both import statements and inline fully qualified use.
+def REFERENCE = ~/com\.costpilot((?:\.[a-z][A-Za-z0-9_]*)+)\.[A-Z][A-Za-z0-9_]*/
+
+// Comments and string literals are not dependencies. A javadoc line that merely *names*
+// com.costpilot.metering.StreamCostMeterFactory is not an edge, and counting it as one
+// produces phantom cycles that send you chasing a coupling that does not exist.
+// Crude but sufficient for Java source: no regex here can be fooled in a way that
+// invents a *real* import, and the worst case is dropping an edge we would have
+// double-counted from the import line anyway.
+def stripNonCode = { String src ->
+	src.replaceAll(/(?s)\/\*.*?\*\//, ' ')      // block + javadoc comments
+	   .replaceAll(/(?m)\/\/.*$/, ' ')          // line comments
+	   .replaceAll(/"(?:[^"\\\n]|\\.)*"/, '""') // string literals
+}
+
+tasks.register('packageCycles') {
+	group = 'verification'
+	description = 'Fails if the com.costpilot.* package graph contains a dependency cycle.'
+
+	def srcRoot = file('src/main/java')
+	def sources = fileTree(dir: srcRoot, include: '**/*.java').files.sort { it.path }
+
+	doLast {
+		// package -> set of packages it references
+		def graph = [:].withDefault { [] as Set }
+		// edge -> the files that create it, so a failure names something actionable
+		def evidence = [:].withDefault { [] as Set }
+
+		sources.each { File f ->
+			def text = stripNonCode(f.getText('UTF-8'))
+			def m = text =~ /(?m)^\s*package\s+([A-Za-z0-9_.]+)\s*;/
+			if (!m) {
+				return
+			}
+			def self = m[0][1]
+			if (!self.startsWith(COSTPILOT)) {
+				return
+			}
+			graph[self]  // make sure isolated packages still appear as nodes
+
+			def refs = text =~ REFERENCE
+			refs.each { match ->
+				def target = COSTPILOT + match[1]
+				if (target != self) {
+					graph[self] << target
+					evidence["$self -> $target".toString()] << f.name
+				}
+			}
+		}
+
+		// Tarjan, iterative - the graph is tiny but recursion here is pointless risk
+		def index = [:]
+		def low = [:]
+		def onStack = [:].withDefault { false }
+		def stack = []
+		def counter = 0
+		def sccs = []
+
+		graph.keySet().toList().each { root ->
+			if (index.containsKey(root)) {
+				return
+			}
+			// each frame: [node, iterator over successors]
+			def work = [[root, graph[root].toList().iterator()]]
+			index[root] = counter
+			low[root] = counter
+			counter++
+			stack << root
+			onStack[root] = true
+
+			while (work) {
+				def frame = work.last()
+				def node = frame[0]
+				def succ = frame[1]
+
+				if (succ.hasNext()) {
+					def next = succ.next()
+					if (!graph.containsKey(next)) {
+						continue  // references a package with no sources of its own
+					}
+					if (!index.containsKey(next)) {
+						index[next] = counter
+						low[next] = counter
+						counter++
+						stack << next
+						onStack[next] = true
+						work << [next, graph[next].toList().iterator()]
+					} else if (onStack[next]) {
+						low[node] = Math.min(low[node], index[next])
+					}
+				} else {
+					work.removeLast()
+					if (work) {
+						def parent = work.last()[0]
+						low[parent] = Math.min(low[parent], low[node])
+					}
+					if (low[node] == index[node]) {
+						def component = []
+						def w
+						do {
+							w = stack.removeLast()
+							onStack[w] = false
+							component << w
+						} while (w != node)
+						if (component.size() > 1) {
+							sccs << component.sort()
+						}
+					}
+				}
+			}
+		}
+
+		if (sccs) {
+			def report = new StringBuilder("Cyclic package dependencies in ${COSTPILOT}:\n")
+			sccs.each { cycle ->
+				report.append("\n  cycle: ${cycle.join(' <-> ')}\n")
+				cycle.each { from ->
+					graph[from].findAll { it in cycle }.sort().each { to ->
+						report.append("    ${from} -> ${to}  (${evidence["$from -> $to".toString()].sort().join(', ')})\n")
+					}
+				}
+			}
+			report.append('\nBreak the cycle before merging - that is how the old `domain` sink formed.')
+			throw new GradleException(report.toString())
+		}
+
+		logger.lifecycle("OK: no package cycles across ${graph.size()} ${COSTPILOT}.* packages")
+	}
+}
+
+tasks.named('check') {
+	dependsOn 'packageCycles'
+}

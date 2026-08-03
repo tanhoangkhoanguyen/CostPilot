@@ -18,8 +18,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.ApiKey;
-import com.costpilot.domain.ApiKeyRepository;
 
 // 6.1 acceptance: unauthenticated requests are blocked; a valid seeded key is accepted;
 // a revoked key is rejected. Exercises the real filter chain end-to-end.

@@ -39,7 +39,7 @@ public class AnthropicAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public String chatPath(CanonicalChatRequest request, com.costpilot.upstream.UpstreamProperties.Provider config) {
+	public String chatPath(CanonicalChatRequest request, com.costpilot.provider.UpstreamProperties.Provider config) {
 		return "/v1/messages";
 	}
 
@@ -69,7 +69,7 @@ public class AnthropicAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public void applyAuth(HttpHeaders headers, com.costpilot.upstream.UpstreamProperties.Provider config) {
+	public void applyAuth(HttpHeaders headers, com.costpilot.provider.UpstreamProperties.Provider config) {
 		headers.set("anthropic-version", ANTHROPIC_VERSION);
 		String apiKey = config.getApiKey();
 		if (apiKey != null && !apiKey.isBlank()) {

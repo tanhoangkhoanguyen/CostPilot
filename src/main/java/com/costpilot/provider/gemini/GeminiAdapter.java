@@ -16,7 +16,7 @@ import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.provider.ProviderAdapter;
 import com.costpilot.provider.UpstreamParseException;
-import com.costpilot.upstream.UpstreamProperties;
+import com.costpilot.provider.UpstreamProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

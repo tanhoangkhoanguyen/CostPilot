@@ -17,7 +17,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.AdminAuditRepository;
 import com.costpilot.security.AuthTestSupport;
 
 // 9.1 acceptance: setting a budget/policy via the admin API changes enforcement

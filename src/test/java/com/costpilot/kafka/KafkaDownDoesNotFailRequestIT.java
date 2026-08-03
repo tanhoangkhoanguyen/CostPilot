@@ -18,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.security.AuthTestSupport;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 
 // 5.2 acceptance: Kafka down => request still succeeds. Kafka is enabled but points at
 // an unreachable broker with fast-fail producer timeouts; the request must still return

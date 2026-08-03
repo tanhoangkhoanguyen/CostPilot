@@ -13,8 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.AuditRecord;
-import com.costpilot.domain.AuditRecordRepository;
+import com.costpilot.audit.AuditRecord;
+import com.costpilot.audit.AuditRecordRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 
 // 6.1 acceptance: per-team data isolation - team A cannot read team B's audit rows. The

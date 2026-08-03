@@ -16,11 +16,10 @@ import org.springframework.stereotype.Component;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.cost.Cost;
 import com.costpilot.cost.CostEstimator;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.cost.PriceLookupService;
-import com.costpilot.cost.PriceNotFoundException;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.ModelPrice;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.pricing.PriceLookupService;
+import com.costpilot.pricing.PriceNotFoundException;
+import com.costpilot.pricing.ModelPrice;
 import com.costpilot.metrics.GovernanceMetrics;
 import com.costpilot.provider.ProviderRegistry;
 

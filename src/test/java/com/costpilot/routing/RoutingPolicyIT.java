@@ -18,8 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.AuditRecord;
-import com.costpilot.domain.AuditRecordRepository;
+import com.costpilot.audit.AuditRecord;
+import com.costpilot.audit.AuditRecordRepository;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthTestSupport;
 
@@ -153,7 +153,7 @@ class RoutingPolicyIT {
 				"claude-sonnet-4-5",
 				List.of(new com.costpilot.core.model.CanonicalChatRequest.Message("user", "hello costpilot")),
 				64, false);
-		com.costpilot.cost.LedgerContext context = new com.costpilot.cost.LedgerContext(
+		com.costpilot.core.model.LedgerContext context = new com.costpilot.core.model.LedgerContext(
 				null, "bar-" + UUID.randomUUID(), null, null, null, UUID.randomUUID().toString());
 
 		var withBar = downgradeService.cheaperAllowedAlternatives(request, context, 3);

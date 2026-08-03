@@ -17,7 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;

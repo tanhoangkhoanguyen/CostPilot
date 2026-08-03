@@ -15,10 +15,8 @@ import org.springframework.context.annotation.Import;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.domain.PendingApproval;
-import com.costpilot.domain.PendingApprovalRepository;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.ledger.UsageRecordRepository;
 
 // 8.1/8.2 acceptance: a parked request is persisted (survives restart), an approved
 // request replays end-to-end into the ledger, and a rejected/expired request never

@@ -7,7 +7,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
-import com.costpilot.upstream.UpstreamProperties;
 
 // Discovers every ProviderAdapter bean via DI - adding a provider is implementing
 // the interface, nothing here changes. Selection: explicit config mapping first

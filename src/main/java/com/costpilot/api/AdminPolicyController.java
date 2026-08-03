@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.costpilot.admin.AdminAuditService;
-import com.costpilot.domain.PolicyRule;
-import com.costpilot.domain.PolicyRuleRepository;
+import com.costpilot.policy.PolicyRule;
+import com.costpilot.policy.PolicyRuleRepository;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.security.CurrentPrincipal;

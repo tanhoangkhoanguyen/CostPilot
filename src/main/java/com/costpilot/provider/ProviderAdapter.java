@@ -7,7 +7,6 @@ import org.springframework.http.HttpHeaders;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
-import com.costpilot.upstream.UpstreamProperties;
 
 /**
  * The single extension point for LLM providers. Adding a provider means

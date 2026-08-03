@@ -10,25 +10,27 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.costpilot.audit.AuditRecord;
+import com.costpilot.audit.AuditService;
 import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalChatResponse;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
 import com.costpilot.core.model.UsageEvent;
-import com.costpilot.cost.AuditService;
 import com.costpilot.cost.Cost;
 import com.costpilot.cost.CostEstimator;
 import com.costpilot.cost.CostService;
-import com.costpilot.cost.DecisionContext;
-import com.costpilot.cost.PriceNotFoundException;
-import com.costpilot.cost.StreamCostMeter;
-import com.costpilot.cost.UsageLedgerService;
-import com.costpilot.domain.AuditRecord;
 import com.costpilot.kafka.UsageEventPublisher;
+import com.costpilot.ledger.DecisionContext;
+import com.costpilot.ledger.UsageLedgerService;
+import com.costpilot.metering.StreamCostMeter;
+import com.costpilot.metering.StreamCostMeterFactory;
 import com.costpilot.metrics.GovernanceMetrics;
+import com.costpilot.pricing.PriceNotFoundException;
 import com.costpilot.provider.ProviderAdapter;
 import com.costpilot.provider.ProviderRegistry;
+import com.costpilot.provider.UpstreamProperties;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -43,6 +45,7 @@ public class ForwardingService {
 	private final UpstreamProperties properties;
 	private final ProviderRegistry registry;
 	private final CostService costService;
+	private final StreamCostMeterFactory meterFactory;
 	private final UsageLedgerService usageLedger;
 	private final AuditService auditService;
 	// optional: present only when costpilot.kafka.enabled=true (5.2)
@@ -53,13 +56,15 @@ public class ForwardingService {
 	private final GovernanceMetrics metrics;
 
 	public ForwardingService(UpstreamProperties properties, ProviderRegistry registry,
-			CostService costService, UsageLedgerService usageLedger, AuditService auditService,
+			CostService costService, StreamCostMeterFactory meterFactory,
+			UsageLedgerService usageLedger, AuditService auditService,
 			ObjectProvider<UsageEventPublisher> eventPublisher,
 			CostEstimator estimator, WebClient.Builder webClientBuilder,
 			ObjectProvider<WebServerApplicationContext> webServerContext, GovernanceMetrics metrics) {
 		this.properties = properties;
 		this.registry = registry;
 		this.costService = costService;
+		this.meterFactory = meterFactory;
 		this.usageLedger = usageLedger;
 		this.auditService = auditService;
 		this.eventPublisher = eventPublisher;
@@ -167,7 +172,7 @@ public class ForwardingService {
 		if (publisher == null) {
 			return;
 		}
-		com.costpilot.cost.LedgerContext ctx = decision.ledger();
+		com.costpilot.core.model.LedgerContext ctx = decision.ledger();
 		UsageEvent event = new UsageEvent(
 				audit.getId(), ctx.tenantId(), ctx.teamId(), ctx.projectId(), ctx.userId(), ctx.environment(),
 				provider, decision.requestedModel(), decision.executedModel(),
@@ -254,7 +259,7 @@ public class ForwardingService {
 
 	private StreamCostMeter meterOrNull(ProviderAdapter adapter, CanonicalChatRequest request, Instant at) {
 		try {
-			return costService.meter(adapter.providerId(), request.model(), at,
+			return meterFactory.meter(adapter.providerId(), request.model(), at,
 					estimator.estimateInputTokens(request));
 		} catch (PriceNotFoundException e) {
 			log.warn("stream unmetered: {}", e.getMessage());

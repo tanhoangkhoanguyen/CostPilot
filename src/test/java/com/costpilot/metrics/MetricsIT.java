@@ -18,8 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
+import com.costpilot.budget.Budget;
+import com.costpilot.budget.BudgetRepository;
 import com.costpilot.security.AuthTestSupport;
 
 // 6.2 acceptance: metrics are scrapeable at /actuator/prometheus, and a budget rejection

@@ -3,7 +3,7 @@ package com.costpilot.api.dto;
 import java.time.Instant;
 import java.util.UUID;
 
-import com.costpilot.domain.AuditRecord;
+import com.costpilot.audit.AuditRecord;
 
 // Read model for the admin audit query (5.1). Cost is rendered as a plain decimal
 // string so no float/precision is lost crossing JSON.

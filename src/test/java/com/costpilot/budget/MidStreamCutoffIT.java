@@ -20,10 +20,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.security.AuthTestSupport;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.UsageRecord;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecord;
+import com.costpilot.ledger.UsageRecordRepository;
 
 /**
  * 4.3 - the headline claim. A generation that would overrun the budget is cut

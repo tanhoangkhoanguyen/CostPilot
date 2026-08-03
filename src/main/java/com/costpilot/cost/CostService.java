@@ -7,7 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.costpilot.core.model.Usage;
-import com.costpilot.domain.ModelPrice;
+import com.costpilot.pricing.ModelPrice;
+import com.costpilot.pricing.PriceLookupService;
 
 @Service
 public class CostService {
@@ -39,8 +40,6 @@ public class CostService {
 		return pricedCostFor(provider, model, usage, at).cost();
 	}
 
-	/** A per-request running meter pinned to the price version active at `at` (4.2). */
-	public StreamCostMeter meter(String provider, String model, Instant at, int assumedInputTokens) {
-		return new StreamCostMeter(priceLookup.priceAt(provider, model, at), calculator, assumedInputTokens);
-	}
+	// The per-request running meter (4.2) is built by
+	// com.costpilot.metering.StreamCostMeterFactory, not here - see that class for why.
 }

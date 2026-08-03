@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.stereotype.Component;
 
 import com.costpilot.core.model.Usage;
-import com.costpilot.domain.ModelPrice;
+import com.costpilot.pricing.ModelPrice;
 
 // cost = input_tokens x in_rate/1k + output_tokens x out_rate/1k, in BigDecimal
 // end to end - token counts and per-1k rates multiply exactly, division by 1000

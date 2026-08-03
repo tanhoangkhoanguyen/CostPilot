@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.costpilot.api.dto.AuditRecordDto;
-import com.costpilot.domain.AuditRecordRepository;
-import com.costpilot.domain.AuditRecordSpecifications;
+import com.costpilot.audit.AuditRecordRepository;
+import com.costpilot.audit.AuditRecordSpecifications;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.security.CurrentPrincipal;
 

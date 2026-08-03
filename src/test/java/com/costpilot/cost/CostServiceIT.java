@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.core.model.Usage;
+import com.costpilot.pricing.PriceNotFoundException;
 
 // Price lookup against the seeded (flyway V2) price table in a real Postgres.
 @SpringBootTest

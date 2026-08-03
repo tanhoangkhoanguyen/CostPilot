@@ -12,14 +12,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.costpilot.domain.ApiKey;
-import com.costpilot.domain.ApiKeyRepository;
-import com.costpilot.domain.Project;
-import com.costpilot.domain.ProjectRepository;
-import com.costpilot.domain.Team;
-import com.costpilot.domain.TeamRepository;
-import com.costpilot.domain.Tenant;
-import com.costpilot.domain.TenantRepository;
+import com.costpilot.tenancy.Project;
+import com.costpilot.tenancy.ProjectRepository;
+import com.costpilot.tenancy.Team;
+import com.costpilot.tenancy.TeamRepository;
+import com.costpilot.tenancy.Tenant;
+import com.costpilot.tenancy.TenantRepository;
 
 import org.mockito.Mockito;
 

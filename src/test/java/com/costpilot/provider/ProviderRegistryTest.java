@@ -11,7 +11,6 @@ import com.costpilot.provider.anthropic.AnthropicAdapter;
 import com.costpilot.provider.gemini.GeminiAdapter;
 import com.costpilot.provider.gemini.VertexTokenProvider;
 import com.costpilot.provider.openai.OpenAiAdapter;
-import com.costpilot.upstream.UpstreamProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class ProviderRegistryTest {

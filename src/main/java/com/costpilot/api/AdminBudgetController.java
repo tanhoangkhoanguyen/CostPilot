@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.costpilot.admin.AdminAuditService;
 import com.costpilot.budget.BudgetScope;
 import com.costpilot.budget.BudgetService;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
+import com.costpilot.budget.Budget;
+import com.costpilot.budget.BudgetRepository;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.security.CurrentPrincipal;
 

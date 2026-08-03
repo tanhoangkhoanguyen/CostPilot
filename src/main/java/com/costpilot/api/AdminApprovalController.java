@@ -14,8 +14,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.costpilot.admin.AdminAuditService;
 import com.costpilot.approval.ApprovalDecisionService;
-import com.costpilot.domain.PendingApproval;
-import com.costpilot.domain.PendingApprovalRepository;
+import com.costpilot.approval.PendingApproval;
+import com.costpilot.approval.PendingApprovalRepository;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.security.CurrentPrincipal;
 
