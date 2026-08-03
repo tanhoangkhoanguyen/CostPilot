@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -147,20 +147,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
       # supply chain: refuse to execute a gradle-wrapper.jar that is not a known
       # upstream release. This runs before any ./gradlew invocation.
-      - uses: gradle/actions/wrapper-validation@v4
+      - uses: gradle/actions/wrapper-validation@v6
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           # only main writes the shared cache; PR runs read it
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -180,7 +180,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-report
           path: build/reports/jacoco/test/html
@@ -188,7 +188,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
@@ -203,14 +203,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile
@@ -237,21 +237,45 @@ jobs:
             echo "::error::image did not reach Spring Boot startup"; exit 1; }
           echo "OK: image boots"
 
-  # Dependency review is PR-only: it diffs the manifest against the base branch and
-  # blocks known-vulnerable or badly licensed additions before they land.
-  dependency-review:
-    if: github.event_name == 'pull_request'
+  # Vulnerability scan over the resolved dependency tree - the jars that actually ship,
+  # not the version ranges in build.gradle.
+  #
+  # Not actions/dependency-review-action: that needs the repo-level Dependency graph
+  # feature, which is off here and can only be turned on by a repo admin. Trivy needs
+  # no repo settings, so this gate actually runs.
+  #
+  # ignore-unfixed keeps the gate actionable: a CVE with no released fix is not
+  # something a PR can resolve, and failing on it would just train people to ignore red.
+  vuln-scan:
     needs: guardrails
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: write
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - uses: actions/dependency-review-action@v4
+
+      - uses: gradle/actions/wrapper-validation@v6
+
+      - uses: actions/setup-java@v5
         with:
-          fail-on-severity: high
-          comment-summary-in-pr: on-failure
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      # Trivy reads the jar tree, so give it a real one to read.
+      - name: Assemble runtime classpath
+        run: ./gradlew bootJar --no-daemon -x test
+
+      - name: Scan for known vulnerabilities
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: rootfs
+          scan-ref: build/libs
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
