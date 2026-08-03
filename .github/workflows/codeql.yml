@@ -1,0 +1,69 @@
+name: CodeQL
+
+# Static analysis for the Java gateway/CLI and for the workflows themselves.
+# Runs on PRs (catch it before merge), on main (keep the default-branch baseline
+# fresh so alerts resolve), and weekly (new queries land after code stops changing).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '27 4 * * 1'
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/wrapper-validation@v6
+        if: matrix.language == 'java-kotlin'
+
+      - uses: gradle/actions/setup-gradle@v6
+        if: matrix.language == 'java-kotlin'
+        with:
+          cache-read-only: true
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      # Manual build mode: compile without tests. CodeQL only needs the classes,
+      # and the Testcontainers suite already runs in the CI workflow.
+      - name: Compile
+        if: matrix.language == 'java-kotlin'
+        run: ./gradlew classes testClasses --no-daemon
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

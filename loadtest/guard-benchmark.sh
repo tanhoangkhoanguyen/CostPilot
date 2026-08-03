@@ -26,7 +26,7 @@ case "$cmd" in
 	stack)
 		echo "== bringing the stack up"
 		docker compose up -d --build
-		for i in $(seq 1 60); do
+		for _ in $(seq 1 60); do
 			s=$(docker inspect costpilot-gateway --format '{{.State.Health.Status}}' 2>/dev/null || echo starting)
 			[ "$s" = "healthy" ] && break
 			sleep 5

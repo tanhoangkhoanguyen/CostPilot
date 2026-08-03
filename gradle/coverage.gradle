@@ -1,0 +1,85 @@
+// JaCoCo coverage gate, split out of build.gradle so the root build file stays a
+// plugin/dependency manifest and everything that decides "does this build pass?"
+// lives in one place. Applied from build.gradle via `apply from:`.
+
+jacoco {
+	toolVersion = '0.8.12'
+}
+
+// Generated/wiring-only classes drag the ratio around without saying anything about
+// correctness - keep the gate focused on logic that can actually break.
+//
+// Every glob here is asserted against the real source tree by `coverageExcludesAreLive`.
+// A stale exclude weakens nothing on its own, but it lies about what the gate covers,
+// which is exactly how `**/config/**` sat here matching zero classes (see #100).
+ext.coverageExcludes = [
+		'**/CostpilotApplication*',
+		'**/dto/**',
+]
+
+// Globs that must still match real source. `**/CostpilotApplication*` is deliberately
+// not probed - it is a single well-known class, not a package convention that can drift.
+ext.probedCoverageExcludes = [
+		'**/dto/**',
+]
+
+tasks.register('coverageExcludesAreLive') {
+	group = 'verification'
+	description = 'Fails if a JaCoCo exclude glob no longer matches any source under src/main/java.'
+
+	def srcRoot = file('src/main/java')
+	// resolve at configuration time so the task action holds no Project reference
+	def hits = probedCoverageExcludes.collectEntries { glob ->
+		[(glob): fileTree(dir: srcRoot, include: glob).files.size()]
+	}
+
+	doLast {
+		def dead = hits.findAll { it.value == 0 }.keySet()
+		if (dead) {
+			throw new GradleException(
+					"Dead JaCoCo exclude(s) in gradle/coverage.gradle: ${dead.join(', ')} - " +
+							'no matching source under src/main/java. Remove the exclude, or fix the package layout ' +
+							'so it matches again. An exclude that matches nothing misrepresents the coverage gate.')
+		}
+		hits.each { glob, n -> logger.lifecycle("OK: coverage exclude ${glob} matches ${n} source file(s)") }
+	}
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn 'test'
+	reports {
+		xml.required = true
+		html.required = true
+	}
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: coverageExcludes)
+	}))
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn 'test'
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: coverageExcludes)
+	}))
+	violationRules {
+		rule {
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.80
+			}
+		}
+		rule {
+			limit {
+				counter = 'BRANCH'
+				value = 'COVEREDRATIO'
+				minimum = 0.60
+			}
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn 'jacocoTestCoverageVerification'
+	dependsOn 'coverageExcludesAreLive'
+}

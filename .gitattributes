@@ -1,3 +1,18 @@
+# Normalize to LF in the repository regardless of the checkout platform.
+* text=auto eol=lf
+
+# Executed on Linux (CI, containers, the load-test hosts). CRLF here is not a style
+# nit - it breaks the shebang and turns `set -euo pipefail` into an invalid option.
+*.sh text eol=lf
 /gradlew text eol=lf
+docker/Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Windows-only entry points keep CRLF
 *.bat text eol=crlf
+*.cmd text eol=crlf
+
 *.jar binary
+*.png binary
+*.gif binary
