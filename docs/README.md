@@ -23,6 +23,7 @@ Everything you need to run it, drive it, and point it at a real provider.
 | 7 | [Response headers and errors](#7-response-headers-and-errors) | what the gateway tells your client |
 | 8 | [Load test](#8-load-test) | reproducing the numbers |
 | 9 | [Development](#9-development) | build, test, coverage gate |
+| 10 | [Releases](#10-releases) | tagging, published image, SBOM, provenance |
 
 ---
 
@@ -313,3 +314,35 @@ Guard quantiles are read from Prometheus at the measurement window, so the decay
 - 170+ tests run against the embedded mock upstream. Coverage gate: line 80%, branch 60%.
 - CI runs the same build on every push and pull request.
 - The build has two modules: the gateway at the root, and `cli/`, which is standalone and deliberately excluded from the coverage gate and the Docker image.
+
+---
+
+## 10. Releases
+
+There is no version to bump by hand. The version comes from the git tag, so the jar, the image tag and the GitHub release cannot disagree about what they are.
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+That triggers [`.github/workflows/release.yml`](../.github/workflows/release.yml), which runs the full test and coverage gate again on the tagged commit, builds the image, **boots it against Postgres and Redis and asserts `/actuator/info` reports `1.2.3`**, and only then publishes.
+
+What comes out:
+
+```bash
+docker pull ghcr.io/tanhoangkhoanguyen/costpilot:1.2.3
+```
+
+- **Image** on GHCR, tagged with the version and `latest`. The exact bytes that passed the boot check are the bytes pushed - the push step ships the tested image rather than rebuilding it.
+- **Jar** and a **CycloneDX SBOM** attached to the GitHub release. The SBOM is generated from the image, so it covers base-image OS packages as well as application jars.
+- **Build provenance**, signed and pushed to the registry alongside the image:
+
+```bash
+gh attestation verify oci://ghcr.io/tanhoangkhoanguyen/costpilot:1.2.3 \
+  --repo tanhoangkhoanguyen/CostPilot
+```
+
+Between tags, the version resolves from `git describe`, so a dev build reports something honest like `1.2.3-4-gabc1234` rather than a stale `0.0.1-SNAPSHOT`. `/actuator/info` also carries the commit sha, which is what you actually want when a container is misbehaving and nobody remembers what shipped.
+
+To exercise the whole pipeline without spending a version number, run the workflow manually (`workflow_dispatch`): it builds, boots, verifies and generates the SBOM, but publishes nothing.

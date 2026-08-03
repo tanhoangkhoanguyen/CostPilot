@@ -15,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  *
  * Everything is authenticated except the operational/dev surfaces that must stay open:
  *  - /actuator/health, /actuator/prometheus  (k8s probes + Prometheus scrape)
+ *  - /actuator/info                           (3.1: which version/commit is running)
  *  - /mock/**                                 (embedded mock upstream the app calls itself)
  *
  * No sessions, no CSRF (there are no browser forms - this is a machine-to-machine gateway).
@@ -37,7 +38,11 @@ public class SecurityConfig {
 						// ("Connection prematurely closed DURING response").
 						.shouldFilterAllDispatcherTypes(false)
 						.requestMatchers("/actuator/health", "/actuator/health/**",
-								"/actuator/prometheus", "/mock/**",
+								"/actuator/prometheus",
+								// 3.1: version + commit of the running artifact. Carries no
+								// secrets (info.env and info.java are off in application.yml)
+								// and is how a deploy gets verified without a key.
+								"/actuator/info", "/mock/**",
 								// 5.4 dashboard: the static SPA shell loads without a key; every
 								// /api/analytics call it makes still carries the admin bearer key
 								// and is authenticated below.

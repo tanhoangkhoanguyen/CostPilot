@@ -1,0 +1,251 @@
+name: Release
+
+# Tagging vX.Y.Z is the entire release trigger. The jar version, the image tag and the
+# GitHub release all derive from that one tag, so they cannot drift apart and there is
+# no version literal for anyone to forget to bump.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+  # exercise the whole pipeline without burning a real version number: builds,
+  # boots and verifies, but publishes nothing
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (dry run - nothing is published)'
+        required: true
+        default: '0.0.0-dryrun'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write      # create the GitHub release, upload assets
+      packages: write      # push to GHCR
+      id-token: write      # OIDC token for build provenance
+      attestations: write  # record the provenance attestation
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/costpilot
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve version
+        id: v
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$DISPATCH_VERSION"
+            PUBLISH=false
+          else
+            VERSION="$GITHUB_REF_NAME"
+            PUBLISH=true
+          fi
+          VERSION="${VERSION#v}"   # tags are vX.Y.Z; the artifacts are not
+          # This string becomes an image tag and a jar filename, so it is validated against
+          # the stricter of the two charsets. Note `+` is deliberately rejected even though
+          # semver allows it as build metadata: it is illegal in an OCI tag, so `v1.2.3+x`
+          # would build fine and then fail at the push.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+[._0-9A-Za-z-]*$'; then
+            echo "::error::refusing to release malformed version '$VERSION' (must be X.Y.Z with an optional [._A-Za-z0-9-] suffix, no '+')"
+            exit 1
+          fi
+          {
+            echo "version=$VERSION"
+            echo "publish=$PUBLISH"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing $VERSION (publish=$PUBLISH)"
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+
+      - uses: gradle/actions/wrapper-validation@v6
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Pre-pull container images
+        run: |
+          docker pull pgvector/pgvector:pg16 &
+          docker pull redis:7-alpine &
+          docker pull apache/kafka:3.8.0 &
+          docker pull clickhouse/clickhouse-server:24-alpine &
+          wait
+
+      # A tag can point at a commit CI never saw green. Re-run the whole gate instead
+      # of assuming it did.
+      - name: Build, test, coverage gate
+        run: ./gradlew build -PreleaseVersion="$VERSION" --no-daemon --stacktrace
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+
+      - name: Stage jar
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          jar="$(find build/libs -name 'costpilot-*.jar' ! -name '*-plain.jar' | head -1)"
+          [ -n "$jar" ] || { echo "::error::no boot jar produced"; exit 1; }
+          cp "$jar" "dist/costpilot-${{ steps.v.outputs.version }}.jar"
+          ls -l dist
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        if: steps.v.outputs.publish == 'true'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            APP_VERSION=${{ steps.v.outputs.version }}
+            APP_COMMIT=${{ github.sha }}
+          # always load locally so the acceptance test below runs against the exact
+          # image bytes that get pushed
+          load: true
+          push: false
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Acceptance criteria, verified rather than asserted:
+      #   "docker run <image> boots against the compose dependencies"
+      #   "version surfaces in /actuator/info"
+      # Kafka and ClickHouse are off by default, so Postgres + Redis is the real
+      # dependency set for a plain boot.
+      - name: Boot the image against compose dependencies
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.v.outputs.version }}"
+          docker compose up -d postgres redis
+          # compose names the network <project>_default; the project defaults to the
+          # checkout directory name, so resolve it instead of hardcoding either
+          NET="$(docker inspect costpilot-postgres \
+                   --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' 2>/dev/null || true)"
+          if [ -z "$NET" ]; then
+            echo "::error::could not resolve the compose network"
+            docker ps -a
+            exit 1
+          fi
+          echo "using network $NET"
+
+          docker run -d --name costpilot-release-check --network "$NET" \
+            -e COSTPILOT_DB_HOST=postgres \
+            -e COSTPILOT_REDIS_HOST=redis \
+            -p 8080:8080 \
+            "${IMAGE}:${VERSION}"
+
+          ok=false
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/actuator/health 2>/dev/null | grep -q '"status":"UP"'; then
+              ok=true; break
+            fi
+            sleep 5
+          done
+          if [ "$ok" != true ]; then
+            echo "::error::image did not become healthy"
+            docker logs costpilot-release-check | tail -100
+            exit 1
+          fi
+
+          info="$(curl -fsS http://localhost:8080/actuator/info)"
+          echo "actuator/info: $info"
+          if ! printf '%s' "$info" | grep -q "\"version\":\"${VERSION}\""; then
+            echo "::error::/actuator/info does not report version ${VERSION}"
+            exit 1
+          fi
+          echo "OK: image boots and reports version ${VERSION}"
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker rm -f costpilot-release-check 2>/dev/null || true
+          docker compose down -v 2>/dev/null || true
+
+      # Push the exact image that just booted, rather than asking buildx to build it
+      # again with push: true. A rebuild would almost certainly be identical, but
+      # "the bytes we tested are the bytes we shipped" should be a fact, not a
+      # near-certainty - and the digest we attest below has to mean something.
+      - name: Push image
+        if: steps.v.outputs.publish == 'true'
+        id: push
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker push "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:latest"
+          digest="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${VERSION}" | cut -d@ -f2)"
+          [ -n "$digest" ] || { echo "::error::could not resolve pushed digest"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "pushed ${IMAGE}:${VERSION} @ $digest"
+
+      # Signed statement binding the pushed digest to this workflow run and commit.
+      - name: Attest build provenance
+        if: steps.v.outputs.publish == 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      # SBOM is taken from the image, not from the Gradle graph, so it covers the base
+      # image packages as well as the application jars - that is what actually ships.
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          image: ${{ env.IMAGE }}:${{ steps.v.outputs.version }}
+          format: cyclonedx-json
+          artifact-name: costpilot-${{ steps.v.outputs.version }}-sbom.cyclonedx.json
+          output-file: dist/costpilot-${{ steps.v.outputs.version }}-sbom.cyclonedx.json
+
+      - name: Publish GitHub release
+        if: steps.v.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          cat > notes.md <<EOF
+          ## costpilot $VERSION
+
+          **Container image**
+          \`\`\`
+          docker pull ${IMAGE}:${VERSION}
+          \`\`\`
+          Digest: \`${{ steps.push.outputs.digest }}\`
+
+          Build provenance is attested and pushed alongside the image; verify with:
+          \`\`\`
+          gh attestation verify oci://${IMAGE}:${VERSION} --repo ${GITHUB_REPOSITORY}
+          \`\`\`
+
+          A CycloneDX SBOM for the image is attached to this release.
+          EOF
+          gh release create "$GITHUB_REF_NAME" \
+            --title "costpilot $VERSION" \
+            --notes-file notes.md \
+            dist/*

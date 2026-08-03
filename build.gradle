@@ -9,7 +9,10 @@ plugins {
 }
 
 group = 'com.costpilot'
-version = '0.0.1-SNAPSHOT'
+
+// version is derived from the git tag - see gradle/versioning.gradle
+apply from: "$rootDir/gradle/versioning.gradle"
+version = costpilotVersion
 
 // boot 3.5.x manages testcontainers 1.21.2, whose bundled docker-java can't talk to
 // docker engine 29+ (old API versions removed) - pin a fixed release
@@ -28,6 +31,24 @@ ext['netty.version'] = '4.1.136.Final'
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+// Bakes META-INF/build-info.properties into the jar so /actuator/info reports the
+// version, commit and build time of the artifact you are actually running - the
+// thing you need when a container is misbehaving and nobody remembers what shipped.
+springBoot {
+	buildInfo {
+		// keep the jar reproducible: a wall-clock timestamp changes the artifact on
+		// every build and defeats caching for no benefit. `excludes` is the way to drop
+		// it - `properties { time = null }` only clears the explicit value and lets the
+		// convention (build start instant) reapply.
+		excludes = ['time']
+		properties {
+			additional = [
+					commit: costpilotCommit,
+			]
+		}
 	}
 }
 

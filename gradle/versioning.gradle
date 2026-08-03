@@ -1,0 +1,62 @@
+// Version comes from git tags instead of a literal that nobody remembers to bump.
+//
+//   on tag v1.2.3            -> 1.2.3
+//   4 commits past v1.2.3    -> 1.2.3-4-gabc1234
+//   dirty working tree       -> ...-dirty
+//   no tag reachable         -> 0.0.0-SNAPSHOT+abc1234
+//   no git at all            -> 0.0.0-SNAPSHOT
+//
+// -PreleaseVersion=X wins over everything. The Docker build stage has no .git
+// directory, and a release has to be reproducible from the tarball alone, so the
+// release workflow passes the tag through explicitly rather than relying on git.
+//
+// Deliberately not `-Pversion=`: Gradle maps that straight onto project.version
+// before this script runs, and the assignment below would silently clobber it.
+
+// ProcessBuilder rather than exec {} / providers.exec: this runs at configuration
+// time on every build, and it must degrade to a default instead of failing when git
+// is missing (Docker build stage, source tarball, CI shallow clone edge cases).
+def git = { File dir, List<String> args ->
+	try {
+		def proc = new ProcessBuilder(['git'] + args)
+				.directory(dir)
+				.redirectErrorStream(true)
+				.start()
+		def out = proc.inputStream.text.trim()
+		// bound the wait so a hung git never wedges the build
+		if (!proc.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)) {
+			proc.destroyForcibly()
+			return null
+		}
+		return (proc.exitValue() == 0 && out) ? out : null
+	} catch (Exception ignored) {
+		return null
+	}
+}
+
+def gitDescribe = { File dir -> git(dir, ['describe', '--tags', '--always', '--dirty=-dirty']) }
+
+def explicit = project.findProperty('releaseVersion')?.toString()?.trim()
+
+String resolved
+if (explicit) {
+	resolved = explicit - ~/^v/
+} else {
+	def described = gitDescribe(rootDir)
+	if (described == null) {
+		resolved = '0.0.0-SNAPSHOT'
+	} else if (described ==~ /^v?\d+\.\d+\.\d+.*/) {
+		// a tag is reachable: v1.2.3, v1.2.3-4-gabc1234, v1.2.3-dirty
+		resolved = described - ~/^v/
+	} else {
+		// only a bare commit sha came back - no release tag exists yet
+		resolved = "0.0.0-SNAPSHOT+${described}"
+	}
+}
+
+ext.costpilotVersion = resolved
+
+// Surfaced through /actuator/info alongside the version. -PreleaseCommit lets the
+// release workflow and the Docker build stage supply it where .git is absent.
+ext.costpilotCommit = project.findProperty('releaseCommit')?.toString()?.trim() ?:
+		(git(rootDir, ['rev-parse', '--short=12', 'HEAD']) ?: 'unknown')

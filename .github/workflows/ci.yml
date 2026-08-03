@@ -113,8 +113,16 @@ jobs:
           require_file settings.gradle
           require_file build.gradle
           require_file gradle/coverage.gradle
+          require_file gradle/versioning.gradle
+          require_file .github/workflows/release.yml
           require_file docker/Dockerfile
           forbid_path Dockerfile
+
+          # 3.1: the version must stay tag-derived. A literal reintroduced here is how
+          # the artifact, the image tag and the release drift apart again.
+          if grep -qE "^\s*version\s*=\s*['\"]" build.gradle cli/build.gradle; then
+            echo "::error::hardcoded version literal in a build file - use costpilotVersion"; fail=1
+          fi
 
           # process/scratch notes are local-only, never committed
           if [ -e docs/superpowers ]; then

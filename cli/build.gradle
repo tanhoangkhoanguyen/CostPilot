@@ -4,7 +4,9 @@ plugins {
 }
 
 group = 'com.costpilot'
-version = '0.0.1-SNAPSHOT'
+// same git-tag-derived version as the gateway, so `costpilot --version` and the
+// image tag never disagree about which release you are looking at
+version = rootProject.costpilotVersion
 
 java {
 	toolchain {
