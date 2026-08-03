@@ -4,6 +4,15 @@
 build
 docs
 *.md
+# the Dockerfile lives here now; BuildKit ships it out of band, but keep the
+# re-include explicit so the classic builder finds it too
 docker
+!docker/Dockerfile
 docker-compose.yml
-Dockerfile
+docker-compose.real.yml
+# not part of the gateway image: separate CLI/SDK builds and local-only material
+cli
+sdk
+loadtest
+secrets
+.env

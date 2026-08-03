@@ -12,7 +12,7 @@ K6_IMAGE="grafana/k6:0.54.0"
 
 echo "== bringing the stack up (cache ON for savings scenario)"
 COSTPILOT_CACHE_ENABLED=true docker compose up -d --build --force-recreate gateway
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
 	s=$(docker inspect costpilot-gateway --format '{{.State.Health.Status}}' 2>/dev/null || echo starting)
 	[ "$s" = "healthy" ] && break
 	sleep 5
@@ -20,7 +20,7 @@ done
 [ "$s" = "healthy" ] || { echo "gateway never became healthy"; exit 1; }
 
 # confirm Flyway applied V15 (cache_hit_log) — recreate may race health before migrate finishes
-for i in $(seq 1 30); do
+for _ in $(seq 1 30); do
 	if $PSQL -Atc "select to_regclass('public.cache_hit_log')" | grep -q cache_hit_log; then
 		break
 	fi

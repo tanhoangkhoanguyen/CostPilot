@@ -3,7 +3,10 @@ services:
   # the default) so the whole demo costs $0. Drop in real keys via env to go live:
   #   COSTPILOT_UPSTREAM_MODE=real COSTPILOT_UPSTREAM_OPENAI_API_KEY=sk-... docker compose up
   gateway:
-    build: .
+    # context stays the repo root; only the Dockerfile itself lives under docker/
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: costpilot-gateway
     ports:
       - "8080:8080"

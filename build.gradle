@@ -81,52 +81,5 @@ tasks.named('test') {
 	}
 }
 
-jacoco {
-	toolVersion = '0.8.12'
-}
-
-// generated/wiring-only classes drag the ratio around without saying anything
-// about correctness - keep the gate focused on logic that can actually break
-def coverageExcludes = [
-		'**/CostpilotApplication*',
-		'**/config/**',
-		'**/dto/**',
-]
-
-tasks.named('jacocoTestReport') {
-	dependsOn 'test'
-	reports {
-		xml.required = true
-		html.required = true
-	}
-	classDirectories.setFrom(files(classDirectories.files.collect {
-		fileTree(dir: it, exclude: coverageExcludes)
-	}))
-}
-
-tasks.named('jacocoTestCoverageVerification') {
-	dependsOn 'test'
-	classDirectories.setFrom(files(classDirectories.files.collect {
-		fileTree(dir: it, exclude: coverageExcludes)
-	}))
-	violationRules {
-		rule {
-			limit {
-				counter = 'LINE'
-				value = 'COVEREDRATIO'
-				minimum = 0.80
-			}
-		}
-		rule {
-			limit {
-				counter = 'BRANCH'
-				value = 'COVEREDRATIO'
-				minimum = 0.60
-			}
-		}
-	}
-}
-
-tasks.named('check') {
-	dependsOn 'jacocoTestCoverageVerification'
-}
+// coverage gate (jacoco config, excludes, thresholds, stale-exclude guard)
+apply from: "$rootDir/gradle/coverage.gradle"

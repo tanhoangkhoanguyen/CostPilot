@@ -102,6 +102,27 @@ Then walk through the ten minute demo, the CLI, the Python SDK, and going live w
 
 ### → [Setup and usage docs](docs/README.md)
 
+## Repo layout
+
+```
+build.gradle  settings.gradle  gradlew  gradle/   build entry point (must be root)
+docker-compose.yml  docker-compose.real.yml       demo stack (must be root)
+docker/                                           Dockerfile + service configs
+src/                                              gateway source (Java only)
+cli/                                              admin CLI, its own Gradle subproject
+sdk/python/                                       Python client, not a Gradle module
+docs/  loadtest/                                  documentation and benchmarks
+```
+
+Four root files are load bearing and cannot be tidied into a subdirectory:
+
+- **`settings.gradle`** is how Gradle finds the build at all. It is discovered from the invocation directory, so moving it breaks `./gradlew`, IDE import, CI, and the Docker build in one shot. `build.gradle`, `gradlew`, and `gradle/` are anchored to it.
+- **`docker-compose*.yml`** are discovered from the current directory too. Compose does not search subdirectories, so moving them turns the one-line quickstart above into `docker compose -f docker/compose.yml ...` everywhere, including every benchmark script.
+
+Everything that *can* move, has. The Dockerfile lives in [docker/Dockerfile](docker/Dockerfile) (compose passes it explicitly with the repo root still as the build context), and the coverage gate lives in [gradle/coverage.gradle](gradle/coverage.gradle) so `build.gradle` stays a plugin and dependency manifest.
+
+`docs/` stays at the root rather than moving under `src/` on purpose: `src/` is the Gradle source root, so every path under it is compiler or resource input. Markdown placed there would either be packaged into the jar or ignored, and GitHub stops rendering `docs/` specially. Documentation is not source.
+
 ---
 
 <div align="center">

@@ -43,7 +43,7 @@ set -a; . ./.env; set +a
 
 echo "== bringing the REAL stack up (Gemini/Vertex upstream)"
 $COMPOSE up -d --build
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
 	s=$(docker inspect costpilot-gateway --format '{{.State.Health.Status}}' 2>/dev/null || echo starting)
 	[ "$s" = "healthy" ] && break
 	sleep 5
