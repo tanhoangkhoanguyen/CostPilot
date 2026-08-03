@@ -27,6 +27,32 @@ class CostpilotApplicationTests {
 		assertThat(response.getBody()).contains("\"status\":\"UP\"");
 	}
 
+	// 3.1 acceptance: a deploy has to be identifiable without a key, so /actuator/info
+	// is permitted and reports the git-tag-derived version plus the commit it was built
+	// from. Guards both halves - the security rule and the build-info wiring.
+	@Test
+	void infoReportsVersionAndCommitWithoutAuth() {
+		ResponseEntity<String> response = restTemplate.getForEntity("/actuator/info", String.class);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getBody())
+				.contains("\"build\"")
+				.containsPattern("\"version\":\"[^\"]+\"")
+				.containsPattern("\"commit\":\"[^\"]+\"");
+	}
+
+	// ... and nothing else. /actuator/info is the one unauthenticated window into the
+	// process, so env (credentials) and java/os (free fingerprinting) stay off it.
+	@Test
+	void infoLeaksNeitherEnvironmentNorRuntimeDetail() {
+		ResponseEntity<String> response = restTemplate.getForEntity("/actuator/info", String.class);
+
+		assertThat(response.getBody())
+				.doesNotContain("\"java\"")
+				.doesNotContain("\"os\"")
+				.doesNotContain("\"env\"");
+	}
+
 	@Test
 	void requestThreadsAreVirtual() {
 		// 6.1: /test/thread-info is now behind auth like any non-permitted path

@@ -12,11 +12,18 @@ COPY gradle gradle
 RUN chmod +x gradlew && ./gradlew dependencies --no-daemon -q || true
 
 COPY src src
-# APP_VERSION is the git-tag-derived version (3.1); unset falls back to the
-# 0.0.1-SNAPSHOT default in build.gradle so plain `docker build` still works.
+
+# There is no .git in this stage, so gradle/versioning.gradle cannot derive the version
+# on its own - it falls back to 0.0.0-SNAPSHOT. The release workflow passes the real tag
+# and commit in, which keeps `docker build` alone working and a release reproducible from
+# the source tree without git history.
 ARG APP_VERSION=""
-RUN ./gradlew bootJar --no-daemon -x test \
-      ${APP_VERSION:+-Pversion="$APP_VERSION"}
+ARG APP_COMMIT=""
+RUN set -eu; \
+    args=""; \
+    if [ -n "$APP_VERSION" ]; then args="$args -PreleaseVersion=$APP_VERSION"; fi; \
+    if [ -n "$APP_COMMIT" ]; then args="$args -PreleaseCommit=$APP_COMMIT"; fi; \
+    ./gradlew bootJar --no-daemon -x test $args
 
 # runtime stage: JRE only, non-root
 FROM eclipse-temurin:21-jre-alpine

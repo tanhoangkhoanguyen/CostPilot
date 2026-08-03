@@ -106,10 +106,27 @@ management:
       exposure:
         # 6.2: prometheus scrape target + health probes; nothing else exposed
         include: health,prometheus,info
+  info:
+    # 3.1: report the version/commit of the artifact actually running. Reads
+    # META-INF/build-info.properties, which the Boot plugin generates from the
+    # git-tag-derived version (gradle/versioning.gradle).
+    build:
+      enabled: true
+    # /actuator/info is unauthenticated (SecurityConfig), so it carries version and
+    # commit and nothing else. env holds credentials; the exact JDK build is free
+    # fingerprinting for an attacker and tells an operator nothing they need.
+    env:
+      enabled: false
+    java:
+      enabled: false
+    os:
+      enabled: false
   endpoint:
     health:
       probes:
         enabled: true
+    info:
+      access: read_only
     prometheus:
       # Boot 3.4+ gates each endpoint by access level; make the scrape readable
       access: read_only
