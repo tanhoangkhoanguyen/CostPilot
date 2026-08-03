@@ -11,7 +11,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import com.costpilot.ledger.UsageRecordRepository;
 
 /**
  * Live remaining-budget counters in Redis, one per active budget.
@@ -37,12 +36,12 @@ public class BudgetService {
 
 	private final StringRedisTemplate redis;
 	private final BudgetRepository budgets;
-	private final UsageRecordRepository usage;
+	private final ScopedSpendReader spend;
 
-	public BudgetService(StringRedisTemplate redis, BudgetRepository budgets, UsageRecordRepository usage) {
+	public BudgetService(StringRedisTemplate redis, BudgetRepository budgets, ScopedSpendReader spend) {
 		this.redis = redis;
 		this.budgets = budgets;
-		this.usage = usage;
+		this.spend = spend;
 	}
 
 	public static String counterKey(BudgetScope scope, String ref) {
@@ -158,12 +157,7 @@ public class BudgetService {
 
 	/** Ledger truth for a scope - what reconciliation checks counters against. */
 	public BigDecimal spentFromLedger(BudgetScope scope, String ref) {
-		return switch (scope) {
-			case TENANT -> usage.totalCostForTenant(ref);
-			case TEAM -> usage.totalCostForTeam(ref);
-			case PROJECT -> usage.totalCostForProject(ref);
-			case MODEL -> usage.totalCostForModel(ref);
-		};
+		return spend.totalCostFor(scope, ref);
 	}
 
 	/** Live remaining in nanodollars, or null when no counter exists (no rebuild attempted). */
