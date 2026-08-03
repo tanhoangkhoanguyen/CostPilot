@@ -1,7 +1,10 @@
 plugins {
 	id 'java'
 	id 'jacoco'
-	id 'org.springframework.boot' version '3.5.3'
+	// stay on 3.5.x: the Boot 3.5 plugin is not Gradle 9 compatible and the wrapper is
+	// 8.14.3. 3.5.16 is the current patch and is what clears the HIGH/CRITICAL CVEs the
+	// vuln-scan job reports against 3.5.3 (spring-security-web CVE-2026-22732 among them).
+	id 'org.springframework.boot' version '3.5.16'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -11,6 +14,11 @@ version = '0.0.1-SNAPSHOT'
 // boot 3.5.x manages testcontainers 1.21.2, whose bundled docker-java can't talk to
 // docker engine 29+ (old API versions removed) - pin a fixed release
 ext['testcontainers.version'] = '1.21.3'
+
+// boot 3.5.16 manages pgjdbc 42.7.11, which still carries CVE-2026-54291 (SCRAM-SHA-256-PLUS
+// downgrade lets a MITM strip channel binding). Fixed in 42.7.12. Drop this override once
+// the managed version catches up.
+ext['postgresql.version'] = '42.7.13'
 
 java {
 	toolchain {
@@ -26,6 +34,23 @@ tasks.withType(JavaCompile).configureEach {
 
 repositories {
 	mavenCentral()
+}
+
+// Two different lz4 coordinates end up on the classpath and both declare the
+// org.lz4:lz4-pure-java capability, so Gradle refuses to pick one on its own:
+//   - kafka-clients pulls at.yawk.lz4:lz4-java, the maintained fork Boot 3.5.16 moved to
+//   - clickhouse-jdbc still pulls the original org.lz4:lz4-pure-java 1.8.0
+// The fork is a drop-in (same net.jpountz.lz4 classes, hence the shared capability) and
+// is the one carrying the CVE-2025-12183 fix, so always resolve toward it. ClickHouse
+// compression keeps working against it - covered by the ClickHouse Testcontainers tests.
+configurations.configureEach {
+	resolutionStrategy.capabilitiesResolution.withCapability('org.lz4:lz4-pure-java') {
+		def fork = candidates.find { it.id.group == 'at.yawk.lz4' }
+		if (fork != null) {
+			select(fork)
+			because 'maintained lz4-java fork, carries the CVE-2025-12183 fix'
+		}
+	}
 }
 
 dependencies {
