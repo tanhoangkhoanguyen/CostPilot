@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.costpilot.domain.ApiKey;
-import com.costpilot.domain.ApiKeyRepository;
+import com.costpilot.security.ApiKey;
+import com.costpilot.security.ApiKeyRepository;
 import com.costpilot.security.ApiKeyHasher;
 
 import jakarta.validation.constraints.NotNull;

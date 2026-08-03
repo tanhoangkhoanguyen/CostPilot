@@ -22,10 +22,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.security.AuthTestSupport;
-import com.costpilot.domain.AuditRecord;
-import com.costpilot.domain.AuditRecordRepository;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
+import com.costpilot.budget.Budget;
+import com.costpilot.budget.BudgetRepository;
 import com.costpilot.policy.PolicyService;
 
 // 5.1 acceptance: every governed request produces a queryable audit row, and a

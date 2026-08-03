@@ -22,8 +22,8 @@ import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.Usage;
 import com.costpilot.cost.CostService;
-import com.costpilot.domain.UsageRecord;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecord;
+import com.costpilot.ledger.UsageRecordRepository;
 import com.costpilot.security.AuthTestSupport;
 
 // 7.3 acceptance: routing a request to a cheaper model records the counterfactual

@@ -8,8 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.costpilot.domain.PendingApproval;
-import com.costpilot.domain.PendingApprovalRepository;
 
 /**
  * 8.2 TTL: pending approvals past their expires_at are auto-rejected as expired so a

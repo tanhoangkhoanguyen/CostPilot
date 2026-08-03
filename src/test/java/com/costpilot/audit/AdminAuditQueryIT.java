@@ -18,8 +18,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.AuditRecord;
-import com.costpilot.domain.AuditRecordRepository;
 import com.costpilot.security.AuthTestSupport;
 import com.fasterxml.jackson.databind.JsonNode;
 

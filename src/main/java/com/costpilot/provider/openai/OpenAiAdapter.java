@@ -33,7 +33,7 @@ public class OpenAiAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public String chatPath(CanonicalChatRequest request, com.costpilot.upstream.UpstreamProperties.Provider config) {
+	public String chatPath(CanonicalChatRequest request, com.costpilot.provider.UpstreamProperties.Provider config) {
 		return "/v1/chat/completions";
 	}
 
@@ -56,7 +56,7 @@ public class OpenAiAdapter implements ProviderAdapter {
 	}
 
 	@Override
-	public void applyAuth(HttpHeaders headers, com.costpilot.upstream.UpstreamProperties.Provider config) {
+	public void applyAuth(HttpHeaders headers, com.costpilot.provider.UpstreamProperties.Provider config) {
 		String apiKey = config.getApiKey();
 		if (apiKey != null && !apiKey.isBlank()) {
 			headers.setBearerAuth(apiKey);

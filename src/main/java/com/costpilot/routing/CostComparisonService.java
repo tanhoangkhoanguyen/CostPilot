@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.cost.Cost;
 import com.costpilot.cost.CostEstimator;
-import com.costpilot.cost.PriceLookupService;
-import com.costpilot.cost.PriceNotFoundException;
+import com.costpilot.pricing.PriceLookupService;
+import com.costpilot.pricing.PriceNotFoundException;
 import com.costpilot.provider.ProviderRegistry;
 
 /**

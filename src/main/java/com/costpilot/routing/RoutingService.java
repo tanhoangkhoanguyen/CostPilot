@@ -12,9 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.domain.ModelCapability;
-import com.costpilot.domain.ModelCapabilityRepository;
+import com.costpilot.core.model.LedgerContext;
 import com.costpilot.policy.PolicyService;
 
 /**

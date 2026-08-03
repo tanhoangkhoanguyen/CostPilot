@@ -11,9 +11,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 
 /**
  * Live remaining-budget counters in Redis, one per active budget.

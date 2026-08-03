@@ -22,10 +22,11 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 
 import com.costpilot.budget.BudgetGuard;
 import com.costpilot.core.model.CanonicalChatResponse;
-import com.costpilot.policy.PolicyDecision;
-import com.costpilot.policy.PolicyService;
 import com.costpilot.core.model.CanonicalStreamChunk;
 import com.costpilot.core.model.Usage;
+import com.costpilot.execution.GovernedRequestExecutor;
+import com.costpilot.policy.PolicyDecision;
+import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.upstream.ForwardingService;
 
@@ -83,7 +84,7 @@ class ChatCompletionsContractTest {
 	private com.costpilot.budget.BudgetService budgetService;
 
 	@MockitoBean
-	private com.costpilot.cost.AuditService auditService;
+	private com.costpilot.audit.AuditService auditService;
 
 	@MockitoBean
 	private com.costpilot.metrics.GovernanceMetrics metrics;

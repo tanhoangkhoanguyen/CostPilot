@@ -8,13 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.costpilot.api.GovernedRequestExecutor;
+import com.costpilot.execution.GovernedRequestExecutor;
 import com.costpilot.api.dto.ChatCompletionResponse;
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.cost.DecisionContext;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.domain.PendingApproval;
-import com.costpilot.domain.PendingApprovalRepository;
+import com.costpilot.ledger.DecisionContext;
+import com.costpilot.core.model.LedgerContext;
 
 /**
  * Stage 8.2: the state machine that resumes or kills a parked request. Only the

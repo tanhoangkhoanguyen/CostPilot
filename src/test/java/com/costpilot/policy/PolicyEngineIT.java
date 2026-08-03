@@ -20,7 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 import com.costpilot.security.AuthTestSupport;
 
 // 3.3 acceptance: rule changes apply without redeploy, every decision is logged

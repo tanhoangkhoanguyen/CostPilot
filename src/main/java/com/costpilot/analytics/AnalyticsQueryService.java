@@ -20,9 +20,9 @@ import com.costpilot.analytics.dto.TopSpender;
 import com.costpilot.analytics.dto.TrendPoint;
 import com.costpilot.budget.BudgetService;
 import com.costpilot.cache.CacheHitLogRepository;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.budget.Budget;
+import com.costpilot.budget.BudgetRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 
 // 5.4: spend analytics served from ClickHouse. Every money query wraps a dedup subquery
 // (collapse duplicate event_id via argMax before aggregating) so results are exact even

@@ -17,7 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.ledger.UsageRecordRepository;
 import com.costpilot.security.AuthTestSupport;
 
 // 10.2 acceptance: a similar prompt is served from cache with no provider call (no new

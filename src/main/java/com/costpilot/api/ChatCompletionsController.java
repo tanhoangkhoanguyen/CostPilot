@@ -17,16 +17,17 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.costpilot.api.dto.ChatCompletionChunk;
 import com.costpilot.api.dto.ChatCompletionRequest;
+import com.costpilot.audit.AuditService;
 import com.costpilot.budget.BudgetGuard;
 import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.core.model.CanonicalStreamChunk;
-import com.costpilot.cost.AuditService;
-import com.costpilot.cost.DecisionContext;
-import com.costpilot.cost.LedgerContext;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.execution.GovernedRequestExecutor;
+import com.costpilot.ledger.DecisionContext;
+import com.costpilot.metrics.GovernanceMetrics;
 import com.costpilot.policy.PolicyDecision;
 import com.costpilot.policy.PolicyDeniedException;
-import com.costpilot.metrics.GovernanceMetrics;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthenticatedPrincipal;
 import com.costpilot.security.CurrentPrincipal;
@@ -104,7 +105,7 @@ public class ChatCompletionsController {
 		LedgerContext ledgerContext = new LedgerContext(tenantId, teamId, projectId, userId, environment,
 				idempotencyKey != null && !idempotencyKey.isBlank() ? idempotencyKey : UUID.randomUUID().toString());
 
-		CanonicalChatRequest canonical = CanonicalChatRequest.from(request);
+		CanonicalChatRequest canonical = request.toCanonical();
 		// the model the client asked for, held across any downgrade so the audit trail
 		// (5.1) can record original-vs-executed
 		String requestedModel = canonical.model();

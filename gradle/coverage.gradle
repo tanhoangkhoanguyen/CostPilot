@@ -11,15 +11,18 @@ jacoco {
 //
 // Every glob here is asserted against the real source tree by `coverageExcludesAreLive`.
 // A stale exclude weakens nothing on its own, but it lies about what the gate covers,
-// which is exactly how `**/config/**` sat here matching zero classes (see #100).
+// which is exactly how `**/config/**` sat here matching zero classes until #100 gave
+// the wiring classes a real package to live in.
 ext.coverageExcludes = [
 		'**/CostpilotApplication*',
+		'**/config/**',
 		'**/dto/**',
 ]
 
 // Globs that must still match real source. `**/CostpilotApplication*` is deliberately
 // not probed - it is a single well-known class, not a package convention that can drift.
 ext.probedCoverageExcludes = [
+		'**/config/**',
 		'**/dto/**',
 ]
 

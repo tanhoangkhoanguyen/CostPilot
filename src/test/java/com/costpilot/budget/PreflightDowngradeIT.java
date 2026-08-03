@@ -26,10 +26,8 @@ import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.cost.Cost;
 import com.costpilot.cost.CostEstimator;
-import com.costpilot.cost.PriceLookupService;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.pricing.PriceLookupService;
+import com.costpilot.ledger.UsageRecordRepository;
 import com.costpilot.policy.PolicyService;
 import com.costpilot.security.AuthTestSupport;
 

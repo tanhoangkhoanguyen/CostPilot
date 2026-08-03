@@ -19,11 +19,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.core.model.Usage;
 import com.costpilot.cost.Cost;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.cost.UsageLedgerService;
-import com.costpilot.domain.Budget;
-import com.costpilot.domain.BudgetRepository;
-import com.costpilot.domain.UsageRecordRepository;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.ledger.UsageLedgerService;
+import com.costpilot.ledger.UsageRecordRepository;
 
 // 3.1 acceptance: counters reconcile with the ledger, stay correct under
 // concurrent charges, and rebuild from the ledger on cold start.

@@ -12,12 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.costpilot.budget.BudgetService;
 import com.costpilot.core.model.CanonicalChatRequest;
 import com.costpilot.cost.CostEstimator;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.cost.PriceLookupService;
-import com.costpilot.cost.PriceNotFoundException;
-import com.costpilot.domain.ModelPrice;
-import com.costpilot.domain.PendingApproval;
-import com.costpilot.domain.PendingApprovalRepository;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.pricing.PriceLookupService;
+import com.costpilot.pricing.PriceNotFoundException;
+import com.costpilot.pricing.ModelPrice;
 import com.costpilot.provider.ProviderRegistry;
 
 /**

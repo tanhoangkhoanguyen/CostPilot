@@ -28,8 +28,8 @@ import com.costpilot.analytics.dto.SavingsSummary;
 import com.costpilot.analytics.dto.SpendBucket;
 import com.costpilot.core.model.Usage;
 import com.costpilot.cost.Cost;
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.cost.UsageLedgerService;
+import com.costpilot.core.model.LedgerContext;
+import com.costpilot.ledger.UsageLedgerService;
 
 // 5.4 acceptance: ClickHouse aggregations reconcile exactly with the Postgres ledger for
 // a fixed window. Seeds matching rows in both stores (no Kafka - this isolates the read
@@ -64,7 +64,7 @@ class AnalyticsReconciliationIT {
 	private JdbcTemplate clickhouseJdbc;
 
 	@Autowired
-	private com.costpilot.domain.UsageRecordRepository usageRepository;
+	private com.costpilot.ledger.UsageRecordRepository usageRepository;
 
 	@Autowired
 	private com.costpilot.cache.CacheHitLogRepository cacheHitLog;

@@ -134,3 +134,6 @@ tasks.named('test') {
 
 // coverage gate (jacoco config, excludes, thresholds, stale-exclude guard)
 apply from: "$rootDir/gradle/coverage.gradle"
+
+// package-cycle guard (#100): keeps the dissolved `domain` sink from reforming
+apply from: "$rootDir/gradle/architecture.gradle"

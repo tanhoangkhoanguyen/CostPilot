@@ -12,9 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.costpilot.cost.LedgerContext;
-import com.costpilot.domain.PolicyRule;
-import com.costpilot.domain.PolicyRuleRepository;
+import com.costpilot.core.model.LedgerContext;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

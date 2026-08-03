@@ -18,7 +18,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.costpilot.TestcontainersConfiguration;
-import com.costpilot.domain.ApiKeyRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 
 // 6.1 acceptance: an admin can mint a key; the returned plaintext authenticates; the DB

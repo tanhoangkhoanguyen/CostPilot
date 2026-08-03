@@ -6,14 +6,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
-import com.costpilot.domain.ApiKey;
-import com.costpilot.domain.ApiKeyRepository;
-import com.costpilot.domain.Project;
-import com.costpilot.domain.ProjectRepository;
-import com.costpilot.domain.Team;
-import com.costpilot.domain.TeamRepository;
-import com.costpilot.domain.Tenant;
-import com.costpilot.domain.TenantRepository;
+import com.costpilot.tenancy.Project;
+import com.costpilot.tenancy.ProjectRepository;
+import com.costpilot.tenancy.Team;
+import com.costpilot.tenancy.TeamRepository;
+import com.costpilot.tenancy.Tenant;
+import com.costpilot.tenancy.TenantRepository;
 
 /**
  * 6.1: turns a presented raw API key into an {@link AuthenticatedPrincipal}.

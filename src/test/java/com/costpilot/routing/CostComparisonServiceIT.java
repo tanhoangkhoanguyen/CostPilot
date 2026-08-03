@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Import;
 
 import com.costpilot.TestcontainersConfiguration;
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.cost.PriceVersioningService;
+import com.costpilot.pricing.PriceVersioningService;
 
 // 7.1 acceptance: given a request + allowed set, the ranked cheapest-first list
 // matches hand-computed fixtures, and estimates use the price version active at

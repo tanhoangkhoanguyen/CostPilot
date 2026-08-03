@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
 import com.costpilot.core.model.Usage;
-import com.costpilot.domain.ModelPrice;
+import com.costpilot.pricing.ModelPrice;
 
 // Hand-calculated fixtures per provider/model (rates match V2 seed data).
 class CostCalculatorTest {

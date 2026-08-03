@@ -2,6 +2,7 @@ package com.costpilot.api.dto;
 
 import java.util.List;
 
+import com.costpilot.core.model.CanonicalChatRequest;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.validation.Valid;
@@ -17,5 +18,18 @@ public record ChatCompletionRequest(
 
 	public boolean isStreaming() {
 		return Boolean.TRUE.equals(stream);
+	}
+
+	/**
+	 * Wire schema -> provider-neutral request. This mapping used to live on
+	 * {@code CanonicalChatRequest.from(...)}, which forced {@code core.model} to import the
+	 * web layer and dragged it into a package cycle (#100). The DTO knowing how to
+	 * normalise itself is the direction that does not couple the core to HTTP.
+	 */
+	public CanonicalChatRequest toCanonical() {
+		List<CanonicalChatRequest.Message> canonicalMessages = messages.stream()
+				.map(m -> new CanonicalChatRequest.Message(m.role(), m.content()))
+				.toList();
+		return new CanonicalChatRequest(model, canonicalMessages, maxTokens, isStreaming());
 	}
 }

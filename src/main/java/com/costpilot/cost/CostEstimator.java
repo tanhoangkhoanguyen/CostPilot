@@ -6,7 +6,7 @@ import java.math.RoundingMode;
 import org.springframework.stereotype.Component;
 
 import com.costpilot.core.model.CanonicalChatRequest;
-import com.costpilot.domain.ModelPrice;
+import com.costpilot.pricing.ModelPrice;
 
 // Conservative pre-flight MAX cost - what the guard reserves before forwarding.
 // Deliberately over-estimates (chars/3 input heuristic, full max_tokens output)
