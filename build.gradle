@@ -20,6 +20,11 @@ ext['testcontainers.version'] = '1.21.3'
 // the managed version catches up.
 ext['postgresql.version'] = '42.7.13'
 
+// same story for netty (reactor-netty, via the webflux WebClient): boot manages
+// 4.1.135.Final, which is one patch short of the five DoS fixes in 4.1.136.Final
+// (CVE-2026-59901 / 55831 / 55833 / 56745 / 56819).
+ext['netty.version'] = '4.1.136.Final'
+
 java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
